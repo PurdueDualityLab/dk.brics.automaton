@@ -1,0 +1,5 @@
+java_library(
+    name = "brics",
+    srcs = glob(["*.java"]),
+    visibility = ["//visibility:public"],
+)
