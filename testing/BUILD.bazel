@@ -1,0 +1,13 @@
+java_binary(
+    name = "test",
+    srcs = ["TestMain.java"],
+    main_class = "testing.TestMain",
+    deps = ["//src/dk/brics/automaton:brics"],
+)
+
+java_binary(
+    name = "cover-toy",
+    srcs = ["CoverageToyMain.java"],
+    main_class = "testing.CoverageToyMain",
+    deps = ["//src/dk/brics/automaton:brics"],
+)
