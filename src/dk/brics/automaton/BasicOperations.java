@@ -43,7 +43,13 @@ import java.util.Set;
  * Basic automata operations.
  */
 final public class BasicOperations {
-	
+
+	private static long defaultDfaBudget = 10_000;
+
+	public static void setDefaultDfaBudget(long budget) {
+		defaultDfaBudget = budget;
+	}
+
 	private BasicOperations() {}
 
 	/** 
@@ -449,10 +455,14 @@ final public class BasicOperations {
 		determinize(a, initialset);
 	}
 
+	static void determinize(Automaton a, Set<State> initialset) {
+		determinize(a, initialset, defaultDfaBudget);
+	}
+
 	/** 
 	 * Determinizes the given automaton using the given set of initial states. 
 	 */
-	static void determinize(Automaton a, Set<State> initialset) {
+	static void determinize(Automaton a, Set<State> initialset, long stateBudget) {
 		char[] points = a.getStartPoints();
 		// subset construction
 		LinkedList<Set<State>> worklist = new LinkedList<Set<State>>();
@@ -489,6 +499,10 @@ final public class BasicOperations {
                         max = Character.MAX_VALUE;
                     r.transitions.add(new Transition(min, max, q));
                 }
+			}
+
+			if (newstate.size() > stateBudget) {
+				throw new DfaBudgetExceededException(stateBudget);
 			}
 		}
 		a.deterministic = true;
