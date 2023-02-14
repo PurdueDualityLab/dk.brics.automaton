@@ -6,10 +6,16 @@ import dk.brics.automaton.BasicOperations;
 import dk.brics.automaton.RegExp;
 
 public class TestMain {
+
+    private static void displayCoverage(AutomatonCoverage coverage) {
+        System.out.printf("All scores: combined=%.4f, positive=%.4f, negative=%.4f%n", coverage.getCoverageScore(), coverage.getPositiveCoverageScore(), coverage.getNegativeCoverageScore());
+        System.out.printf("Details: covered nodes=%d, covered edges=%d%n", coverage.getVisitedStates().size(), coverage.getVisitedEdges().size());
+    }
+
     public static void main(String[] args) {
         BasicOperations.setDefaultDfaBudget(100);
 
-        RegExp regex = new RegExp("[a-z]+123[A-Z]+");
+        RegExp regex = new RegExp("(a+|b+)(c+|d+)");
 
         Automaton auto = regex.toAutomaton();
         auto.determinize();
@@ -18,27 +24,21 @@ public class TestMain {
         System.out.printf("Built automaton with %d states", stateCount);
 
         AutomatonCoverage coverage = new AutomatonCoverage(auto);
-        coverage.evaluateNegative("");
+        coverage.evaluatePositive("ac");
+        coverage.evaluatePositive("aac");
+        coverage.evaluatePositive("acc");
+        coverage.evaluatePositive("ad");
+        coverage.evaluatePositive("aad");
+        coverage.evaluatePositive("add");
+        coverage.evaluatePositive("bd");
+        coverage.evaluatePositive("bbd");
+        coverage.evaluatePositive("bdd");
+        coverage.evaluatePositive("bc");
+        coverage.evaluatePositive("bbc");
+        coverage.evaluatePositive("bcc");
 
-        double score = coverage.getCoverageScore();
-        System.out.printf("Coverage score: %.4f%n", score);
-
-        coverage.evaluateNegative("a");
-        score = coverage.getCoverageScore();
-        System.out.printf("Coverage score: %.4f%n", score);
-
-        coverage.evaluateNegative("aaaaa");
-        score = coverage.getCoverageScore();
-        System.out.printf("Coverage score: %.4f%n", score);
-
-        coverage.evaluatePositive("b123Z");
-        score = coverage.getCoverageScore();
-        System.out.printf("Coverage score: %.4f%n", score);
-
-        coverage.evaluatePositive("aaaaa123ZZZZZZZZZZ");
-        score = coverage.getCoverageScore();
-        System.out.printf("Coverage score: %.4f%n", score);
-
-        System.out.printf("All scores: combined=%.4f, positive=%.4f, negative=%.4f%n", score, coverage.getPositiveCoverageScore(), coverage.getNegativeCoverageScore());
+        displayCoverage(coverage);
+        System.out.println(coverage.getVisitedEdges());
+        System.out.println(coverage.getVisitedStates());
     }
 }

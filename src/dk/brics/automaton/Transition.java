@@ -30,6 +30,7 @@
 package dk.brics.automaton;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 /** 
  * <code>Automaton</code> transition. 
@@ -45,12 +46,14 @@ public class Transition implements Serializable, Cloneable {
 	/* 
 	 * CLASS INVARIANT: min<=max
 	 */
-	
+
+	private int id;
+
 	char min;
 	char max;
 	
 	State to;
-	
+
 	/** 
 	 * Constructs a new singleton interval transition. 
 	 * @param c transition character
@@ -59,6 +62,7 @@ public class Transition implements Serializable, Cloneable {
 	public Transition(char c, State to)	{
 		min = max = c;
 		this.to = to;
+		this.id = 0;
 	}
 	
 	/** 
@@ -77,6 +81,7 @@ public class Transition implements Serializable, Cloneable {
 		this.min = min;
 		this.max = max;
 		this.to = to;
+		this.id = 0;
 	}
 	
 	/** Returns minimum of this transition interval. */
@@ -93,8 +98,24 @@ public class Transition implements Serializable, Cloneable {
 	public State getDest() {
 		return to;
 	}
-	
-	/** 
+
+	/**
+	 * Gets some arbitrary id associated with this edge. Default is zero unless set
+	 * @return Associated id
+	 */
+	public int getId() {
+		return id;
+	}
+
+	/**
+	 * Associates some id with this transition
+	 * @param id Id to give
+	 */
+	public void setId(int id) {
+		this.id = id;
+	}
+
+	/**
 	 * Checks for equality.
 	 * @param obj object to compare with
 	 * @return true if <code>obj</code> is a transition with same 
@@ -172,6 +193,19 @@ public class Transition implements Serializable, Cloneable {
 			b.append("-");
 			appendCharString(max, b);
 		}
+		if (this.id != 0) {
+			b.append(',');
+			b.append(getId());
+		}
 		b.append("\"]\n");
+	}
+
+	/**
+	 * Determines if the edge accepts a given input character
+	 * @param testChar Character to potentially take
+	 * @return True if this character can go across this edge, false otherwise
+	 */
+	public boolean accepts(char testChar) {
+		return testChar >= min && testChar <= max;
 	}
 }
