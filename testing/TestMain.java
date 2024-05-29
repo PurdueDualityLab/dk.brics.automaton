@@ -24,18 +24,18 @@ public class TestMain {
         System.out.printf("Built automaton with %d states", stateCount);
 
         AutomatonCoverage coverage = new AutomatonCoverage(auto);
-        coverage.evaluatePositive("ac");
-        coverage.evaluatePositive("aac");
-        coverage.evaluatePositive("acc");
-        coverage.evaluatePositive("ad");
-        coverage.evaluatePositive("aad");
-        coverage.evaluatePositive("add");
-        coverage.evaluatePositive("bd");
-        coverage.evaluatePositive("bbd");
-        coverage.evaluatePositive("bdd");
-        coverage.evaluatePositive("bc");
-        coverage.evaluatePositive("bbc");
-        coverage.evaluatePositive("bcc");
+        coverage.evaluate("ac");
+        coverage.evaluate("aac");
+        coverage.evaluate("acc");
+        coverage.evaluate("ad");
+        coverage.evaluate("aad");
+        coverage.evaluate("add");
+        coverage.evaluate("bd");
+        coverage.evaluate("bbd");
+        coverage.evaluate("bdd");
+        coverage.evaluate("bc");
+        coverage.evaluate("bbc");
+        coverage.evaluate("bcc");
 
         displayCoverage(coverage);
         System.out.println(coverage.getVisitedEdges());

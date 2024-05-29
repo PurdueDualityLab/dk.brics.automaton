@@ -4,10 +4,6 @@ import java.util.*;
 
 public class TransitionTable {
 
-    // Sparse matrix transition table. For each map, the key is the destination state, and the value is a set of
-    // transitions that can be used to transition between the two
-    private final Map<Integer, Map<Integer, Set<Transition>>> table;
-
     private static Map<Integer, Set<Transition>> createDestTableFromState(State state) {
         Map<Integer, Set<Transition>> destinationMap = new HashMap<>();
         for (Transition trans : state.transitions) {
@@ -33,6 +29,10 @@ public class TransitionTable {
 
         return neighbors;
     }
+
+    // Sparse matrix transition table. For each map, the key is the destination state, and the value is a set of
+    // transitions that can be used to transition between the two
+    private final Map<Integer, Map<Integer, Set<Transition>>> table;
 
     public TransitionTable(Automaton auto) {
         // Initialize table

@@ -1,18 +1,59 @@
 package dk.brics.automaton;
 
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 public class AutomatonCoverage {
+
+    private static final class EdgePair {
+        private final int left;
+        private final int middle;
+        private final int right;
+
+        private EdgePair(int left, int middle, int right) {
+            this.left = left;
+            this.middle = middle;
+            this.right = right;
+        }
+
+        public int getLeft() {
+            return left;
+        }
+
+        public int getMiddle() {
+            return middle;
+        }
+
+        public int getRight() {
+            return right;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            EdgePair edgePair = (EdgePair) o;
+            return left == edgePair.left && middle == edgePair.middle && right == edgePair.right;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(left, middle, right);
+        }
+    }
 
     private static class VisitationInfo {
         private final Set<Integer> visitedNodes;
         private final Set<Integer> visitedEdges;
+        private final Set<EdgePair> visitedEdgePairs;
 
-        public VisitationInfo(Set<Integer> visitedNodes, Set<Integer> visitedEdges) {
+        public VisitationInfo() {
+            this(new HashSet<>(), new HashSet<>(), new HashSet<>());
+        }
+
+        public VisitationInfo(Set<Integer> visitedNodes, Set<Integer> visitedEdges, Set<EdgePair> visitedEdgePairs) {
             this.visitedNodes = visitedNodes;
             this.visitedEdges = visitedEdges;
+            this.visitedEdgePairs = visitedEdgePairs;
         }
 
         public Set<Integer> getVisitedNodes() {
@@ -22,100 +63,72 @@ public class AutomatonCoverage {
         public Set<Integer> getVisitedEdges() {
             return visitedEdges;
         }
+
+        public Set<EdgePair> getVisitedEdgePairs() {
+            return visitedEdgePairs;
+        }
+
+        public void foldIn(VisitationInfo other) {
+            this.visitedNodes.addAll(other.getVisitedNodes());
+            this.visitedEdges.addAll(other.getVisitedEdges());
+            this.visitedEdgePairs.addAll(other.getVisitedEdgePairs());
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            VisitationInfo that = (VisitationInfo) o;
+            return Objects.equals(visitedNodes, that.visitedNodes) && Objects.equals(visitedEdges, that.visitedEdges) && Objects.equals(visitedEdgePairs, that.visitedEdgePairs);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(visitedNodes, visitedEdges, visitedEdgePairs);
+        }
     }
 
-    private final Automaton automaton;
     private final RunAutomaton runAutomaton;
     private final TransitionTable transitionTable;
 
-    private final Set<Integer> positiveVisitedStates;
-    private final Set<Integer> negativeVisitedStates;
-
-    private final Set<Integer> positiveVisitedEdges;
-    private final Set<Integer> negativeVisitedEdges;
+    private final VisitationInfo positiveVisitationInfo;
+    private final VisitationInfo negativeVisitationInfo;
 
     public AutomatonCoverage(Automaton automaton) {
-        this.automaton = automaton;
-        this.runAutomaton = new RunAutomaton(this.automaton);
+        this.runAutomaton = new RunAutomaton(automaton);
         this.transitionTable = new TransitionTable(automaton);
 
-        this.positiveVisitedStates = new HashSet<>();
-        this.negativeVisitedStates = new HashSet<>();
-        this.positiveVisitedEdges = new HashSet<>();
-        this.negativeVisitedEdges = new HashSet<>();
+        positiveVisitationInfo = new VisitationInfo();
+        negativeVisitationInfo = new VisitationInfo();
     }
 
-    public double getCoverageScore() {
-        // for now, let's do something naive. Just combine
-        Set<Integer> combinedVisited = new HashSet<>(this.positiveVisitedStates);
-        combinedVisited.addAll(negativeVisitedStates);
-
-        Set<Integer> combinedVisitedEdges = new HashSet<>(this.positiveVisitedEdges);
-        combinedVisitedEdges.addAll(negativeVisitedEdges);
-
-        // How many of the states get visited
-        double nodeCoverageRatio = combinedVisited.size() / ((double) this.automaton.getNumberOfStates());
-        double edgeCoverageRatio = combinedVisitedEdges.size() / ((double) this.transitionTable.countTotalTransitions());
-        return nodeCoverageRatio * edgeCoverageRatio;
+    public void evaluate(Collection<? extends String> strings) {
+        strings.forEach(this::evaluate);
     }
 
-    public double getPositiveCoverageScore() {
-        double nodeCoverageRatio = positiveVisitedStates.size() / ((double) this.automaton.getNumberOfStates());
-        double edgeCoverageRatio = positiveVisitedEdges.size() / ((double) this.transitionTable.countTotalTransitions());
-        return nodeCoverageRatio * edgeCoverageRatio;
+    public void evaluate(String subject, boolean matches) {
+        VisitationInfo visited = this.evaluateString(subject);
+        if (matches) {
+            positiveVisitationInfo.foldIn(visited);
+        } else {
+            negativeVisitationInfo.foldIn(visited);
+        }
     }
 
-    public double getNegativeCoverageScore() {
-        double nodeCoverageRatio = negativeVisitedStates.size() / ((double) this.automaton.getNumberOfStates());
-        double edgeCoverageRatio = negativeVisitedEdges.size() / ((double) this.transitionTable.countTotalTransitions());
-        return nodeCoverageRatio * edgeCoverageRatio;
-    }
-
-    public void evaluatePositive(String positive) {
-        VisitationInfo visited = this.evaluateString(positive);
-        this.positiveVisitedStates.addAll(visited.getVisitedNodes());
-        this.positiveVisitedEdges.addAll(visited.getVisitedEdges());
-    }
-
-    public void evaluateNegative(String negative) {
-        VisitationInfo visited = this.evaluateString(negative);
-        this.negativeVisitedStates.addAll(visited.getVisitedNodes());
-        this.negativeVisitedEdges.addAll(visited.getVisitedEdges());
-    }
-
-    public Set<Integer> getPositiveVisitedStates() {
-        return positiveVisitedStates;
-    }
-
-    public Set<Integer> getNegativeVisitedStates() {
-        return negativeVisitedStates;
-    }
-
-    public Set<Integer> getPositiveVisitedEdges() {
-        return positiveVisitedEdges;
-    }
-
-    public Set<Integer> getNegativeVisitedEdges() {
-        return negativeVisitedEdges;
-    }
-
-    public Set<Integer> getVisitedStates() {
-        Set<Integer> combinedVisited = new HashSet<>(this.positiveVisitedStates);
-        combinedVisited.addAll(negativeVisitedStates);
-        return combinedVisited;
-    }
-
-    public Set<Integer> getVisitedEdges() {
-        Set<Integer> combinedVisitedEdges = new HashSet<>(this.positiveVisitedEdges);
-        combinedVisitedEdges.addAll(negativeVisitedEdges);
-        return combinedVisitedEdges;
+    public void evaluate(String subject) {
+        boolean matches = runAutomaton.run(subject);
+        evaluate(subject, matches);
     }
 
     private VisitationInfo evaluateString(String input) {
         Set<Integer> visited = new HashSet<>();
         Set<Integer> visitedEdges = new HashSet<>();
+        Set<EdgePair> visitedEdgePairs = new HashSet<>();
+
+        OptionalInt previousState = OptionalInt.empty(); // used for edge pair
         int stateCursor = this.runAutomaton.getInitialState();
         visited.add(stateCursor); // first state is always visited
+
         int currentPos = 0;
         while (currentPos < input.length()) {
             char transitionCharacter = input.charAt(currentPos);
@@ -131,12 +144,18 @@ public class AutomatonCoverage {
                 Optional<Transition> takenEdge = transitionTable.findEdgeBetweenStates(stateCursor, nextState, transitionCharacter);
                 takenEdge.ifPresent(transition -> visitedEdges.add(transition.getId()));
 
+                // record edge pair if possible
+                int finalStateCursor = stateCursor;
+                previousState.ifPresent(prevState -> visitedEdgePairs.add(new EdgePair(prevState, finalStateCursor, nextState)));
+
+                // move states along
+                previousState = OptionalInt.of(stateCursor);
                 stateCursor = nextState;
             }
             // Update the cursor
             currentPos++;
         }
 
-        return new VisitationInfo(visited, visitedEdges);
+        return new VisitationInfo(visited, visitedEdges, visitedEdgePairs);
     }
 }
