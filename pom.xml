@@ -50,7 +50,7 @@
   </properties>
 
   <build>
-    <sourceDirectory>src</sourceDirectory>
+    <sourceDirectory>src/main/java</sourceDirectory>
     <outputDirectory>build</outputDirectory>
     <plugins>
       <plugin>
