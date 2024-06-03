@@ -29,20 +29,14 @@
 
 package dk.brics.automaton;
 
-import java.io.BufferedReader;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.StreamTokenizer;
+import javax.xml.crypto.Data;
+import java.io.*;
+import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.net.URLDecoder;
+import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 /**
  * Basic automata for representing common datatypes
@@ -806,7 +800,10 @@ final public class Datatypes {
 		System.out.println("Building Unicode category automata...");
 		Map<String,Set<Integer>> categories = new HashMap<String,Set<Integer>>();
 		try {
-			StreamTokenizer st = new StreamTokenizer(new BufferedReader(new FileReader("src/Unicode.txt")));
+			URL unicodeFileURL = Datatypes.class.getClassLoader().getResource("Unicode.txt");
+            assert unicodeFileURL != null;
+            File unicodeFile = new File(unicodeFileURL.toURI());
+			StreamTokenizer st = new StreamTokenizer(new BufferedReader(new FileReader(unicodeFile)));
 			st.resetSyntax();
 			st.whitespaceChars(';', ';');
 			st.whitespaceChars('\n', ' ');
@@ -834,8 +831,10 @@ final public class Datatypes {
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(-1);
-		}
-		List<Automaton> assigned = new ArrayList<Automaton>();
+		} catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+        List<Automaton> assigned = new ArrayList<Automaton>();
 		for (Map.Entry<String,Set<Integer>> me : categories.entrySet()) {
 			List<Automaton> la1 = new ArrayList<Automaton>();
 			List<Automaton> la2 = new ArrayList<Automaton>();
@@ -855,7 +854,47 @@ final public class Datatypes {
 		put(automata, "Cn", cn);
 		put(automata, "C", automata.get("C").clone().union(cn));
 	}
-	
+
+	public static String[] getResourceListing(Class<?> clazz, String path) throws URISyntaxException, IOException {
+		URL dirURL = clazz.getClassLoader().getResource(path);
+		if (dirURL != null && dirURL.getProtocol().equals("file")) {
+			/* A file path: easy enough */
+			return new File(dirURL.toURI()).list();
+		}
+
+		if (dirURL == null) {
+			/*
+			 * In case of a jar file, we can't actually find a directory.
+			 * Have to assume the same jar as clazz.
+			 */
+			String me = clazz.getName().replace(".", "/")+".class";
+			dirURL = clazz.getClassLoader().getResource(me);
+		}
+
+		if (dirURL.getProtocol().equals("jar")) {
+			/* A JAR path */
+			String jarPath = dirURL.getPath().substring(5, dirURL.getPath().indexOf("!")); //strip out only the JAR file
+			JarFile jar = new JarFile(URLDecoder.decode(jarPath, "UTF-8"));
+			Enumeration<JarEntry> entries = jar.entries(); //gives ALL entries in jar
+			Set<String> result = new HashSet<String>(); //avoid duplicates in case it is a subdirectory
+			while(entries.hasMoreElements()) {
+				String name = entries.nextElement().getName();
+				if (name.startsWith(path)) { //filter according to the path
+					String entry = name.substring(path.length());
+					int checkSubdir = entry.indexOf("/");
+					if (checkSubdir >= 0) {
+						// if it is a subdirectory, we just return the directory name
+						entry = entry.substring(0, checkSubdir);
+					}
+					result.add(entry);
+				}
+			}
+			return result.toArray(new String[result.size()]);
+		}
+
+		throw new UnsupportedOperationException("Cannot list files for URL "+dirURL);
+	}
+
 	private static Automaton makeCodePoint(int cp) {
 		if (cp >= 0x10000) {
 			cp -= 0x10000;
