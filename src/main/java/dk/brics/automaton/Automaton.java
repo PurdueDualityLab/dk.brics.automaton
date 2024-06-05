@@ -322,7 +322,7 @@ public class Automaton implements Serializable, Cloneable {
 	/** 
 	 * Assigns consecutive numbers to the given states. 
 	 */
-	static void setStateNumbers(Set<State> states) {
+	static void setStateNumbers(Collection<State> states) {
 		if (states.size() == Integer.MAX_VALUE)
 			throw new IllegalArgumentException("number of states exceeded Integer.MAX_VALUE");
 		int number = 0;

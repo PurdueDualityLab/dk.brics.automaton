@@ -197,10 +197,12 @@ public class RegExp {
 	 * @exception IllegalArgumentException if an error occured while parsing the regular expression
 	 */
 	public RegExp(String s, int syntax_flags) throws IllegalArgumentException {
+		// strip potential anchors
+		s = stripAnchors(s);
 		b = s;
 		flags = syntax_flags;
 		RegExp e;
-		if (s.length() == 0)
+		if (s.isEmpty())
 			e = makeString("");
 		else {
 			e = parseUnionExp();
@@ -723,9 +725,11 @@ public class RegExp {
 	}
 
 	final RegExp parseUnionExp() throws IllegalArgumentException {
+		// check for start anchor, discard if necessary
 		RegExp e = parseInterExp();
 		if (match('|'))
 			e = makeUnion(e, parseUnionExp());
+
 		return e;
 	}
 
@@ -884,5 +888,16 @@ public class RegExp {
 	final char parseCharExp() throws IllegalArgumentException {
 		match('\\');
 		return next();
+	}
+
+	private static String stripAnchors(String pattern) {
+		if (pattern.isEmpty()) {
+			return pattern;
+		}
+
+		int start = pattern.charAt(0) == '^' ? 1 : 0;
+		int end = pattern.charAt(pattern.length() - 1) == '$' ? pattern.length() - 1 : pattern.length();
+
+		return pattern.substring(start, end);
 	}
 }

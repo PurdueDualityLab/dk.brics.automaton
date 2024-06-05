@@ -36,7 +36,9 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.net.URL;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Finite-state automaton with fast run operation.
@@ -194,7 +196,7 @@ public class RunAutomaton implements Serializable {
 	public RunAutomaton(Automaton a, boolean tableize) {
 		a.determinize();
 		points = a.getStartPoints();
-		Set<State> states = a.getStates();
+		List<State> states = a.getStates().stream().sorted().collect(Collectors.toList());
 		Automaton.setStateNumbers(states);
 		initial = a.initial.number;
 		size = states.size();

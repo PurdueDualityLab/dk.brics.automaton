@@ -1,6 +1,7 @@
 package dk.brics.automaton;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class TransitionTable {
 
@@ -35,6 +36,7 @@ public class TransitionTable {
     private final Map<Integer, Map<Integer, Set<Transition>>> table;
 
     public TransitionTable(Automaton auto) {
+
         // Initialize table
         table = new HashMap<>();
 
@@ -51,7 +53,11 @@ public class TransitionTable {
             // Get the next states to check. Only enqueue states that we haven't visited yet
             getAdjacentStates(state).stream()
                     .filter(neighbor -> !visitedStates.contains(neighbor.id))
-                    .forEach(traversalQueue::add);
+                    .forEach(item -> {
+                        if (!traversalQueue.contains(item)) {
+                            traversalQueue.add(item);
+                        }
+                    });
         }
 
         // Give everything an ID
@@ -104,5 +110,29 @@ public class TransitionTable {
         return getTransitionsBetweenStates(leftStateNumber, rightStateNumber).stream()
                 .filter(transition -> transition.accepts(testChar))
                 .findAny();
+    }
+
+    public int countPossibleEdgePairs() {
+        Set<AutomatonCoverage.EdgePair> edgePairs = new HashSet<>();
+        for (int leftState : table.keySet()) {
+            Set<Integer> possibleMiddleStates = getSuccessors(leftState);
+            for (int middleState : possibleMiddleStates) {
+                Set<Integer> rightStates = getSuccessors(middleState);
+                for (int rightState : rightStates) {
+                    edgePairs.add(new AutomatonCoverage.EdgePair(leftState, middleState, rightState));
+                }
+            }
+        }
+
+        return edgePairs.size();
+    }
+
+    private Set<Integer> getSuccessors(int state) {
+        Map<Integer, Set<Transition>> outgoingTransitions = this.table.get(state);
+        if (outgoingTransitions == null) {
+            return Collections.emptySet();
+        }
+
+        return outgoingTransitions.keySet();
     }
 }

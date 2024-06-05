@@ -4,12 +4,12 @@ import java.util.*;
 
 public class AutomatonCoverage {
 
-    private static final class EdgePair {
+    public static final class EdgePair {
         private final int left;
         private final int middle;
         private final int right;
 
-        private EdgePair(int left, int middle, int right) {
+        public EdgePair(int left, int middle, int right) {
             this.left = left;
             this.middle = middle;
             this.right = right;
@@ -41,7 +41,7 @@ public class AutomatonCoverage {
         }
     }
 
-    private static class VisitationInfo {
+    public static final class VisitationInfo {
         private final Set<Integer> visitedNodes;
         private final Set<Integer> visitedEdges;
         private final Set<EdgePair> visitedEdgePairs;
@@ -74,6 +74,21 @@ public class AutomatonCoverage {
             this.visitedEdgePairs.addAll(other.getVisitedEdgePairs());
         }
 
+        public VisitationInfo combineWith(VisitationInfo other) {
+            Set<Integer> combinedVisitedNodes = new HashSet<>(this.visitedNodes);
+            combinedVisitedNodes.addAll(other.visitedNodes);
+            Set<Integer> combinedVisitedEdges = new HashSet<>(this.visitedEdges);
+            combinedVisitedEdges.addAll(other.visitedEdges);
+            Set<EdgePair> combinedVisitedEdgePairs = new HashSet<>(this.visitedEdgePairs);
+            combinedVisitedEdgePairs.addAll(other.visitedEdgePairs);
+
+            return new VisitationInfo(
+                    combinedVisitedNodes,
+                    combinedVisitedEdges,
+                    combinedVisitedEdgePairs
+            );
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -88,6 +103,44 @@ public class AutomatonCoverage {
         }
     }
 
+    public static final class VisitationInfoSummary {
+        private final double nodeCoverage;
+        private final double edgeCoverage;
+        private final double edgePairCoverage;
+
+        public VisitationInfoSummary(double nodeCoverage, double edgeCoverage, double edgePairCoverage) {
+            this.nodeCoverage = nodeCoverage;
+            this.edgeCoverage = edgeCoverage;
+            this.edgePairCoverage = edgePairCoverage;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            VisitationInfoSummary that = (VisitationInfoSummary) o;
+            return Double.compare(nodeCoverage, that.nodeCoverage) == 0 && Double.compare(edgeCoverage, that.edgeCoverage) == 0 && Double.compare(edgePairCoverage, that.edgePairCoverage) == 0;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(nodeCoverage, edgeCoverage, edgePairCoverage);
+        }
+
+        public double getNodeCoverage() {
+            return nodeCoverage;
+        }
+
+        public double getEdgeCoverage() {
+            return edgeCoverage;
+        }
+
+        public double getEdgePairCoverage() {
+            return edgePairCoverage;
+        }
+    }
+
+    private final Automaton originalAutomaton;
     private final RunAutomaton runAutomaton;
     private final TransitionTable transitionTable;
 
@@ -95,7 +148,9 @@ public class AutomatonCoverage {
     private final VisitationInfo negativeVisitationInfo;
 
     public AutomatonCoverage(Automaton automaton) {
+        this.originalAutomaton = automaton;
         this.runAutomaton = new RunAutomaton(automaton);
+
         this.transitionTable = new TransitionTable(automaton);
 
         positiveVisitationInfo = new VisitationInfo();
@@ -118,6 +173,27 @@ public class AutomatonCoverage {
     public void evaluate(String subject) {
         boolean matches = runAutomaton.run(subject);
         evaluate(subject, matches);
+    }
+
+    public VisitationInfoSummary getVisitationInfoSummary() {
+        VisitationInfo info = getVisitationInfo();
+        double nodeCoverage = (double) info.getVisitedNodes().size() / originalAutomaton.getLiveStates().size();
+        double edgeCoverage = (double) info.getVisitedEdges().size() / originalAutomaton.getNumberOfTransitions();
+        double edgePairCoverage = (double) info.getVisitedEdgePairs().size() / transitionTable.countPossibleEdgePairs();
+
+        return new VisitationInfoSummary(nodeCoverage, edgeCoverage, edgePairCoverage);
+    }
+
+    public VisitationInfo getVisitationInfo() {
+        return positiveVisitationInfo.combineWith(negativeVisitationInfo);
+    }
+
+    public VisitationInfo getPositiveVisitationInfo() {
+        return positiveVisitationInfo;
+    }
+
+    public VisitationInfo getNegativeVisitationInfo() {
+        return negativeVisitationInfo;
     }
 
     private VisitationInfo evaluateString(String input) {
