@@ -17,7 +17,7 @@ class AutomatonCoverageTest {
         coverage.evaluate("a");
         coverage.evaluate("b");
         coverage.evaluate("c");
-        AutomatonCoverage.VisitationInfo info = coverage.getVisitationInfo();
+        AutomatonCoverage.VisitationInfo info = coverage.getFullMatchVisitationInfo();
 
         Set<Integer> liveStates = statesToStateNums(auto.getLiveStates());
 
@@ -33,7 +33,7 @@ class AutomatonCoverageTest {
 
         coverage.evaluate("abd");
 
-        AutomatonCoverage.VisitationInfo info = coverage.getVisitationInfo();
+        AutomatonCoverage.VisitationInfo info = coverage.getFullMatchVisitationInfo();
         assertThat(info.getVisitedNodes()).containsExactlyInAnyOrderElementsOf(statesToStateNums(auto.getLiveStates()));
         assertThat(info.getVisitedEdges().size()).isEqualTo(auto.getNumberOfTransitions());
     }
@@ -46,7 +46,7 @@ class AutomatonCoverageTest {
 
         coverage.evaluate("http://");
 
-        AutomatonCoverage.VisitationInfo info = coverage.getVisitationInfo();
+        AutomatonCoverage.VisitationInfo info = coverage.getFullMatchVisitationInfo();
 
         Set<Integer> states = statesToStateNums(auto.getLiveStates());
         states.remove(4);
@@ -61,7 +61,7 @@ class AutomatonCoverageTest {
 
         coverage.evaluate("https://");
 
-        AutomatonCoverage.VisitationInfo info = coverage.getVisitationInfo();
+        AutomatonCoverage.VisitationInfo info = coverage.getFullMatchVisitationInfo();
 
         Set<Integer> states = statesToStateNums(auto.getLiveStates());
         assertThat(info.getVisitedNodes()).containsExactlyInAnyOrderElementsOf(states);
@@ -77,7 +77,7 @@ class AutomatonCoverageTest {
         coverage.evaluate("https://");
         coverage.evaluate("http://");
 
-        AutomatonCoverage.VisitationInfo info = coverage.getVisitationInfo();
+        AutomatonCoverage.VisitationInfo info = coverage.getFullMatchVisitationInfo();
 
         assertThat(info.getVisitedNodes()).containsExactlyInAnyOrderElementsOf(statesToStateNums(auto.getLiveStates()));
         assertThat(info.getVisitedEdges().size()).isEqualTo(auto.getNumberOfTransitions());

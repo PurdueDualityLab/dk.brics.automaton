@@ -4,6 +4,39 @@ import java.util.*;
 
 public class AutomatonCoverage {
 
+    public static final int FAILURE_STATE_ID = -1;
+
+    public static final class Edge {
+        private final int leftStateId;
+        private final int rightStateId;
+
+        public Edge(int leftStateId, int rightStateId) {
+            this.leftStateId = leftStateId;
+            this.rightStateId = rightStateId;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Edge edge = (Edge) o;
+            return leftStateId == edge.leftStateId && rightStateId == edge.rightStateId;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(leftStateId, rightStateId);
+        }
+
+        public int getLeftStateId() {
+            return leftStateId;
+        }
+
+        public int getRightStateId() {
+            return rightStateId;
+        }
+    }
+
     public static final class EdgePair {
         private final int left;
         private final int middle;
@@ -43,14 +76,14 @@ public class AutomatonCoverage {
 
     public static final class VisitationInfo {
         private final Set<Integer> visitedNodes;
-        private final Set<Integer> visitedEdges;
+        private final Set<Edge> visitedEdges;
         private final Set<EdgePair> visitedEdgePairs;
 
         public VisitationInfo() {
             this(new HashSet<>(), new HashSet<>(), new HashSet<>());
         }
 
-        public VisitationInfo(Set<Integer> visitedNodes, Set<Integer> visitedEdges, Set<EdgePair> visitedEdgePairs) {
+        public VisitationInfo(Set<Integer> visitedNodes, Set<Edge> visitedEdges, Set<EdgePair> visitedEdgePairs) {
             this.visitedNodes = visitedNodes;
             this.visitedEdges = visitedEdges;
             this.visitedEdgePairs = visitedEdgePairs;
@@ -60,7 +93,7 @@ public class AutomatonCoverage {
             return visitedNodes;
         }
 
-        public Set<Integer> getVisitedEdges() {
+        public Set<Edge> getVisitedEdges() {
             return visitedEdges;
         }
 
@@ -72,7 +105,7 @@ public class AutomatonCoverage {
             visitedNodes.add(node);
         }
 
-        public void addVisitedEdge(int edge) {
+        public void addVisitedEdge(Edge edge) {
             visitedEdges.add(edge);
         }
 
@@ -89,7 +122,7 @@ public class AutomatonCoverage {
         public VisitationInfo combineWith(VisitationInfo other) {
             Set<Integer> combinedVisitedNodes = new HashSet<>(this.visitedNodes);
             combinedVisitedNodes.addAll(other.visitedNodes);
-            Set<Integer> combinedVisitedEdges = new HashSet<>(this.visitedEdges);
+            Set<Edge> combinedVisitedEdges = new HashSet<>(this.visitedEdges);
             combinedVisitedEdges.addAll(other.visitedEdges);
             Set<EdgePair> combinedVisitedEdgePairs = new HashSet<>(this.visitedEdgePairs);
             combinedVisitedEdgePairs.addAll(other.visitedEdgePairs);
@@ -99,6 +132,28 @@ public class AutomatonCoverage {
                     combinedVisitedEdges,
                     combinedVisitedEdgePairs
             );
+        }
+
+        /**
+         * Visit everything at once.
+         * @param previousState The state we were at
+         * @param currentState The state we are current on
+         * @param nextState The state we are about to go to
+         */
+        public void visitConfiguration(Integer previousState, int currentState, Integer nextState) {
+            // visit the center state
+            addVisitedNode(currentState);
+
+            // add an edge if needed
+            if (previousState == null) {
+                return;
+            }
+
+            addVisitedEdge(new Edge(previousState, currentState));
+
+            if (nextState != null) {
+                addVisitedEdgePair(new EdgePair(previousState, currentState, nextState));
+            }
         }
 
         @Override
@@ -162,7 +217,6 @@ public class AutomatonCoverage {
     public AutomatonCoverage(Automaton automaton) {
         this.originalAutomaton = automaton;
         this.runAutomaton = new RunAutomaton(automaton);
-
         this.transitionTable = new TransitionTable(automaton);
 
         fullMatchVisitationInfo = new VisitationInfo();
@@ -183,9 +237,9 @@ public class AutomatonCoverage {
     }
 
     private VisitationInfoSummary summarizeVisitationInfo(VisitationInfo info) {
-        double nodeCoverage = (double) info.getVisitedNodes().size() / originalAutomaton.getLiveStates().size();
-        double edgeCoverage = (double) info.getVisitedEdges().size() / originalAutomaton.getNumberOfTransitions();
-        double edgePairCoverage = (double) info.getVisitedEdgePairs().size() / transitionTable.countPossibleEdgePairs();
+        double nodeCoverage = (double) info.getVisitedNodes().size() / computeNumberOfStates();
+        double edgeCoverage = (double) info.getVisitedEdges().size() / computeNumberOfEdges();
+        double edgePairCoverage = (double) info.getVisitedEdgePairs().size() / computeNumberOfEdgePairs();
 
         return new VisitationInfoSummary(nodeCoverage, edgeCoverage, edgePairCoverage);
     }
@@ -210,6 +264,14 @@ public class AutomatonCoverage {
             char transitionCharacter = input.charAt(currentPos);
             int nextState = this.runAutomaton.step(stateCursor, transitionCharacter);
             if (nextState == -1) {
+
+                // we have encountered a failure state/edge
+                visitationInfo.addVisitedEdge(new Edge(stateCursor, FAILURE_STATE_ID));
+
+                // add an edge pair as well
+                int finalStateCursor2 = stateCursor;
+                previousState.ifPresent(prevState -> visitationInfo.addVisitedEdgePair(new EdgePair(prevState, finalStateCursor2, FAILURE_STATE_ID)));
+
                 // there's no outgoing state, then there are two things we can try:
                 if (fullMatch) {
                     // if we're in full match mode, then we're done
@@ -223,9 +285,9 @@ public class AutomatonCoverage {
                 // We moved to another state, so that state should be marked as visited
                 visitationInfo.addVisitedNode(nextState);
 
-                // Find an edge between the two states and mark it as visited
-                Optional<Transition> takenEdge = transitionTable.findEdgeBetweenStates(stateCursor, nextState, transitionCharacter);
-                takenEdge.ifPresent(transition -> visitationInfo.addVisitedEdge(transition.getId()));
+                // construct an edge with our current state info
+                int finalStateCursor1 = stateCursor;
+                previousState.ifPresent(prevState -> visitationInfo.addVisitedEdge(new Edge(prevState, finalStateCursor1)));
 
                 // record edge pair if possible
                 int finalStateCursor = stateCursor;
@@ -240,5 +302,23 @@ public class AutomatonCoverage {
         }
 
         return visitationInfo;
+    }
+
+    private int computeNumberOfStates() {
+        // add one for the error state
+        return originalAutomaton.getLiveStates().size() + 1;
+    }
+
+    private int computeNumberOfEdges() {
+        // all edges + an edge from each state to the failure state
+        return originalAutomaton.getNumberOfTransitions() + originalAutomaton.getNumberOfStates();
+    }
+
+    /**
+     * TODO figure out how to compute this without using the transition table
+     * @return Number of possible edge pairs
+     */
+    private int computeNumberOfEdgePairs() {
+        return transitionTable.countPossibleEdgePairs() + originalAutomaton.getNumberOfTransitions();
     }
 }
