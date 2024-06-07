@@ -68,6 +68,18 @@ public class AutomatonCoverage {
             return visitedEdgePairs;
         }
 
+        private void addVisitedNode(int node) {
+            visitedNodes.add(node);
+        }
+
+        public void addVisitedEdge(int edge) {
+            visitedEdges.add(edge);
+        }
+
+        public void addVisitedEdgePair(EdgePair edgePair) {
+            visitedEdgePairs.add(edgePair);
+        }
+
         public void foldIn(VisitationInfo other) {
             this.visitedNodes.addAll(other.getVisitedNodes());
             this.visitedEdges.addAll(other.getVisitedEdges());
@@ -144,8 +156,8 @@ public class AutomatonCoverage {
     private final RunAutomaton runAutomaton;
     private final TransitionTable transitionTable;
 
-    private final VisitationInfo positiveVisitationInfo;
-    private final VisitationInfo negativeVisitationInfo;
+    private final VisitationInfo fullMatchVisitationInfo;
+    private final VisitationInfo partialMatchVisitationInfo;
 
     public AutomatonCoverage(Automaton automaton) {
         this.originalAutomaton = automaton;
@@ -153,30 +165,24 @@ public class AutomatonCoverage {
 
         this.transitionTable = new TransitionTable(automaton);
 
-        positiveVisitationInfo = new VisitationInfo();
-        negativeVisitationInfo = new VisitationInfo();
-    }
-
-    public void evaluate(Collection<? extends String> strings) {
-        strings.forEach(this::evaluate);
-    }
-
-    public void evaluate(String subject, boolean matches) {
-        VisitationInfo visited = this.evaluateString(subject);
-        if (matches) {
-            positiveVisitationInfo.foldIn(visited);
-        } else {
-            negativeVisitationInfo.foldIn(visited);
-        }
+        fullMatchVisitationInfo = new VisitationInfo();
+        partialMatchVisitationInfo = new VisitationInfo();
     }
 
     public void evaluate(String subject) {
-        boolean matches = runAutomaton.run(subject);
-        evaluate(subject, matches);
+        fullMatchVisitationInfo.foldIn(evaluateString(subject, true));
+        partialMatchVisitationInfo.foldIn(evaluateString(subject, false));
     }
 
-    public VisitationInfoSummary getVisitationInfoSummary() {
-        VisitationInfo info = getVisitationInfo();
+    public VisitationInfoSummary getFullMatchVisitationInfoSummary() {
+        return summarizeVisitationInfo(getFullMatchVisitationInfo());
+    }
+
+    public VisitationInfoSummary getPartialMatchVisitationInfoSummary() {
+        return summarizeVisitationInfo(getPartialMatchVisitationInfo());
+    }
+
+    private VisitationInfoSummary summarizeVisitationInfo(VisitationInfo info) {
         double nodeCoverage = (double) info.getVisitedNodes().size() / originalAutomaton.getLiveStates().size();
         double edgeCoverage = (double) info.getVisitedEdges().size() / originalAutomaton.getNumberOfTransitions();
         double edgePairCoverage = (double) info.getVisitedEdgePairs().size() / transitionTable.countPossibleEdgePairs();
@@ -184,45 +190,46 @@ public class AutomatonCoverage {
         return new VisitationInfoSummary(nodeCoverage, edgeCoverage, edgePairCoverage);
     }
 
-    public VisitationInfo getVisitationInfo() {
-        return positiveVisitationInfo.combineWith(negativeVisitationInfo);
+    public VisitationInfo getFullMatchVisitationInfo() {
+        return fullMatchVisitationInfo;
     }
 
-    public VisitationInfo getPositiveVisitationInfo() {
-        return positiveVisitationInfo;
+    public VisitationInfo getPartialMatchVisitationInfo() {
+        return partialMatchVisitationInfo;
     }
 
-    public VisitationInfo getNegativeVisitationInfo() {
-        return negativeVisitationInfo;
-    }
-
-    private VisitationInfo evaluateString(String input) {
-        Set<Integer> visited = new HashSet<>();
-        Set<Integer> visitedEdges = new HashSet<>();
-        Set<EdgePair> visitedEdgePairs = new HashSet<>();
+    private VisitationInfo evaluateString(String input, boolean fullMatch) {
+        VisitationInfo visitationInfo = new VisitationInfo();
 
         OptionalInt previousState = OptionalInt.empty(); // used for edge pair
         int stateCursor = this.runAutomaton.getInitialState();
-        visited.add(stateCursor); // first state is always visited
+        visitationInfo.addVisitedNode(stateCursor); // first state is always visited
 
         int currentPos = 0;
         while (currentPos < input.length()) {
             char transitionCharacter = input.charAt(currentPos);
             int nextState = this.runAutomaton.step(stateCursor, transitionCharacter);
             if (nextState == -1) {
-                // there's no outgoing state
-                break;
+                // there's no outgoing state, then there are two things we can try:
+                if (fullMatch) {
+                    // if we're in full match mode, then we're done
+                    break;
+                } else {
+                    // otherwise, we should restart the automaton
+                    stateCursor = runAutomaton.getInitialState();
+                    previousState = OptionalInt.empty();
+                }
             } else {
                 // We moved to another state, so that state should be marked as visited
-                visited.add(nextState);
+                visitationInfo.addVisitedNode(nextState);
 
                 // Find an edge between the two states and mark it as visited
                 Optional<Transition> takenEdge = transitionTable.findEdgeBetweenStates(stateCursor, nextState, transitionCharacter);
-                takenEdge.ifPresent(transition -> visitedEdges.add(transition.getId()));
+                takenEdge.ifPresent(transition -> visitationInfo.addVisitedEdge(transition.getId()));
 
                 // record edge pair if possible
                 int finalStateCursor = stateCursor;
-                previousState.ifPresent(prevState -> visitedEdgePairs.add(new EdgePair(prevState, finalStateCursor, nextState)));
+                previousState.ifPresent(prevState -> visitationInfo.addVisitedEdgePair(new EdgePair(prevState, finalStateCursor, nextState)));
 
                 // move states along
                 previousState = OptionalInt.of(stateCursor);
@@ -232,6 +239,6 @@ public class AutomatonCoverage {
             currentPos++;
         }
 
-        return new VisitationInfo(visited, visitedEdges, visitedEdgePairs);
+        return visitationInfo;
     }
 }
