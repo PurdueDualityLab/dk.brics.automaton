@@ -1,14 +1,15 @@
 package dk.brics.automaton;
 
-import java.sql.Array;
+import java.io.FileNotFoundException;
 import java.util.*;
+import java.io.PrintWriter;
 
 public class Egret {
 
+    static int LIMIT = 2000;
     static ArrayList<String> list = new ArrayList<>();
-    static Map<Integer, ArrayList<Integer>> nextStates = new HashMap<>();
 
-    public static void getRegexStrings(String s) {
+    public static void getRegexStrings(String s) throws FileNotFoundException {
 
         // setting up the automaton
         RegExp regExp = new RegExp(s);
@@ -22,7 +23,7 @@ public class Egret {
         }
 
         // finding basis strings
-        ArrayList<String> strings = findBasisPath(auto.getInitialState(), path, visited);
+        ArrayList<String> strings = findBasisPath(auto.getInitialState(), path, visited, s);
 
         // printing basis string
         System.out.println(strings);
@@ -38,57 +39,54 @@ public class Egret {
         return transitions;
     }
 
-    private static ArrayList<String> addCharacters(Transition transition, ArrayList<String> pathStrings) {
+    private static ArrayList<String> addCharacters(ArrayList<Transition> transitions, ArrayList<String> pathStrings) {
         ArrayList<String> newPathStrings = new ArrayList<>();
+        ArrayList<Character> charsToAppend = new ArrayList<>();
 
-        // if the transition is a range
-        if (transition.getMin() != transition.getMax()) {
-            if (!pathStrings.isEmpty()) {
-                for (String s : pathStrings) {
-                    // replace each string every combination of itself and the range characters
-                    for (char c = transition.getMin(); c <= transition.getMax(); c++) {
-                        newPathStrings.add(s + String.valueOf(c));
-                    }
-                }
-            }
-            else {
-                // add all range characters to the list
-                for (char c = transition.getMin(); c <= transition.getMax(); c++) {
-                    newPathStrings.add(c + "");
-                }
+        // making a list of each character option to append
+        for (Transition t : transitions) {
+            for (char c = t.getMin(); c <= t.getMax(); c++) {
+                charsToAppend.add(c);
             }
         }
-        // if the transition is not a range
-        else {
-            if (!pathStrings.isEmpty()) {
-                pathStrings.replaceAll(s -> s + transition.getMin());
-                newPathStrings.addAll(pathStrings);
+
+        // adding characters
+        if (!pathStrings.isEmpty()) {
+            for (String s : pathStrings) {
+                for (Character c : charsToAppend) {
+                    newPathStrings.add(s + c);
+                }
             }
-            else {
-                newPathStrings.add(String.valueOf(transition.getMin()));
+        } else {
+            for (Character c : charsToAppend) {
+                newPathStrings.add(c.toString());
             }
         }
 
         return newPathStrings;
     }
 
-    private static void addPathToList(ArrayList<State> path) {
+    private static void addPathToList(ArrayList<State> path, String s) throws FileNotFoundException {
         ArrayList<String> pathStrings = new ArrayList<>();
         for (int i = 0; i < path.size() - 1; i++) {
             ArrayList<Transition> transitions = findTransitions(path.get(i), path.get(i + 1));
-            for (Transition t : transitions) {
-                pathStrings = addCharacters(t, pathStrings);
-            }
+            pathStrings = addCharacters(transitions, pathStrings);
         }
-
-        list.addAll(pathStrings);
+        while (list.size() < LIMIT && !pathStrings.isEmpty()) {
+            list.add(0, pathStrings.remove(0));
+        }
+        if (list.size() >= LIMIT) {
+            PrintWriter log = new PrintWriter("src/test/java/dk/brics/automaton/EgretLog");
+            log.println("List size reached the limit (" + LIMIT + "). Cannot add any more strings from RegEx " + s);
+            log.close();
+        }
     }
 
     private static ArrayList<State> deepCopy(ArrayList<State> path) {
         return new ArrayList<>(path);
     }
 
-    private static ArrayList<String> findBasisPath(State curr, ArrayList<State> path, Map<State, Boolean> visited) {
+    private static ArrayList<String> findBasisPath(State curr, ArrayList<State> path, Map<State, Boolean> visited, String s) throws FileNotFoundException {
 
         // add state to path
         ArrayList<State> currPath = deepCopy(path);
@@ -98,7 +96,8 @@ public class Egret {
         // if curr_state is the final state:
         if (curr.isAccept()) {
             // add path to list
-            addPathToList(currPath);
+            addPathToList(currPath, s);
+
             // match all states in path as visited
             for (State state : currPath) {
                 visited.put(state, true);
@@ -109,7 +108,7 @@ public class Egret {
         else if (visited.get(curr)) {
             // next_state = lowest-numbered state that has a transition from curr_state to next_state
             State next = curr.getSortedTransitions(false).get(0).getDest();
-            findBasisPath(next, currPath, visited);
+            findBasisPath(next, currPath, visited, s);
         }
 
         // else:
@@ -118,7 +117,7 @@ public class Egret {
             List<Transition> transitions = curr.getSortedTransitions(false);
             for (Transition transition : transitions) {
                 State dest = transition.getDest();
-                findBasisPath(dest, currPath, visited);
+                findBasisPath(dest, currPath, visited, s);
             }
         }
 
