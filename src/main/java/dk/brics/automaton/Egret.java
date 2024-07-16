@@ -6,16 +6,18 @@ import java.io.PrintWriter;
 
 public class Egret {
 
-    static int LIMIT = 2000;
-    static ArrayList<String> list = new ArrayList<>();
+    static int LANG_LIMIT = 2000;
+    static int MEM_LIMIT = 1000;
 
-    public static void getRegexStrings(String s) throws FileNotFoundException {
+    public static Set<String> getRegexStrings(String s) throws FileNotFoundException {
 
         // setting up the automaton
         RegExp regExp = new RegExp(s);
         Automaton auto = regExp.toAutomaton();
+        auto.reduce();
 
-        // initializing visited states list
+        // initializing lists
+        ArrayList<String> language = new ArrayList<>();
         ArrayList<State> path = new ArrayList<>();
         Map<State, Boolean> visited = new HashMap<>();
         for (State state : auto.getStates()) {
@@ -23,10 +25,10 @@ public class Egret {
         }
 
         // finding basis strings
-        ArrayList<String> strings = findBasisPath(auto.getInitialState(), path, visited, s);
+        findBasisPath(auto.getInitialState(), path, visited, s, language);
 
-        // printing basis string
-        System.out.println(strings);
+        // returning language
+        return new HashSet<>(language);
     }
 
     private static ArrayList<Transition> findTransitions(State state1, State state2) {
@@ -66,18 +68,18 @@ public class Egret {
         return newPathStrings;
     }
 
-    private static void addPathToList(ArrayList<State> path, String s) throws FileNotFoundException {
+    private static void addPathToList(ArrayList<State> path, String s, ArrayList<String> language) throws FileNotFoundException {
         ArrayList<String> pathStrings = new ArrayList<>();
         for (int i = 0; i < path.size() - 1; i++) {
             ArrayList<Transition> transitions = findTransitions(path.get(i), path.get(i + 1));
             pathStrings = addCharacters(transitions, pathStrings);
         }
-        while (list.size() < LIMIT && !pathStrings.isEmpty()) {
-            list.add(0, pathStrings.remove(0));
+        while (language.size() < LANG_LIMIT && !pathStrings.isEmpty()) {
+            language.add(0, pathStrings.remove(0));
         }
-        if (list.size() >= LIMIT) {
+        if (language.size() >= LANG_LIMIT) {
             PrintWriter log = new PrintWriter("src/test/java/dk/brics/automaton/EgretLog");
-            log.println("List size reached the limit (" + LIMIT + "). Cannot add any more strings from RegEx " + s);
+            log.println("List size reached the limit (" + LANG_LIMIT + "). Cannot add any more strings from RegEx " + s);
             log.close();
         }
     }
@@ -86,41 +88,25 @@ public class Egret {
         return new ArrayList<>(path);
     }
 
-    private static ArrayList<String> findBasisPath(State curr, ArrayList<State> path, Map<State, Boolean> visited, String s) throws FileNotFoundException {
+    private static void findBasisPath(State curr, ArrayList<State> path, Map<State, Boolean> visited, String s, ArrayList<String> language) throws FileNotFoundException {
 
-        // add state to path
         ArrayList<State> currPath = deepCopy(path);
         currPath.add(curr);
+        boolean beenHere = visited.get(curr);
 
-
-        // if curr_state is the final state:
         if (curr.isAccept()) {
-            // add path to list
-            addPathToList(currPath, s);
-
-            // match all states in path as visited
+            addPathToList(currPath, s, language);
             for (State state : currPath) {
                 visited.put(state, true);
             }
         }
-
-        // else if curr_state.visited:
-        else if (visited.get(curr)) {
-            // next_state = lowest-numbered state that has a transition from curr_state to next_state
-            State next = curr.getSortedTransitions(false).get(0).getDest();
-            findBasisPath(next, currPath, visited, s);
-        }
-
-        // else:
         else {
-            // for each next_state that has a transition from curr_state to next_state:
             List<Transition> transitions = curr.getSortedTransitions(false);
-            for (Transition transition : transitions) {
-                State dest = transition.getDest();
-                findBasisPath(dest, currPath, visited, s);
+            for (Transition t : transitions) {
+                if (t.getDest().equals(curr)) continue;
+                findBasisPath(t.getDest(), currPath, visited, s, language);
+                if (beenHere) break;
             }
         }
-
-        return list;
     }
 }
