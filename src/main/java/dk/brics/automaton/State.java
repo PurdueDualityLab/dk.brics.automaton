@@ -48,6 +48,7 @@ public class State implements Serializable, Comparable<State> {
 	Set<Transition> transitions;
 	
 	int number;
+    int numVisits = 0;
 	
 	int id;
 	static int next_id;
