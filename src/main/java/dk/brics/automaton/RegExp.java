@@ -30,11 +30,7 @@
 package dk.brics.automaton;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Regular Expression extension to <code>Automaton</code>.
@@ -813,14 +809,28 @@ public class RegExp {
 	}
 
 	final RegExp parseCharClass() throws IllegalArgumentException {
-		char c = parseCharExp();
-		if (match('-'))
-			if (peek("]"))
-                return makeUnion(makeChar(c), makeChar('-'));
-            else
-                return makeCharRange(c, parseCharExp());
-		else
-			return makeChar(c);
+		if (match('\\')) {
+			// special case of a meta character
+			RegExp classStart = parseEscapedCharacter();
+			if (match('-')) {
+				if (peek("]")) {
+					return makeUnion(classStart, makeChar('-'));
+				} else {
+					throw new IllegalArgumentException("ranges with named character classes as the ends are not supported");
+				}
+			} else {
+				return classStart;
+			}
+		} else {
+			char c = parseCharExp();
+			if (match('-'))
+				if (peek("]"))
+					return makeUnion(makeChar(c), makeChar('-'));
+				else
+					return makeCharRange(c, parseCharExp());
+			else
+				return makeChar(c);
+		}
 	}
 
 	final RegExp parseSimpleExp() throws IllegalArgumentException {
@@ -881,12 +891,64 @@ public class RegExp {
 					throw new IllegalArgumentException("interval syntax error at position " + (pos - 1));
 				}
 			}
-		} else
+		} else if (match('\\')) {
+			return parseEscapedCharacter();
+		}
 			return makeChar(parseCharExp());
 	}
 
+	/**
+	 * TODO: this needs a better name
+	 * @return
+	 * @throws IllegalArgumentException
+	 */
+	final RegExp parseEscapedCharacter() throws IllegalArgumentException {
+
+		if (!peek("dDwWsS")) {
+			return makeChar(parseCharExp());
+		}
+
+		// special character class
+		char ccIdentifier = next();
+		RegExp resultingRegExp = null;
+		boolean negate = false;
+		switch (ccIdentifier) {
+			case 'D':
+				negate = true;
+			case 'd':
+				resultingRegExp = makeCharRange('0', '9');
+				break;
+
+			case 'W':
+				negate = true;
+			case 'w':
+				resultingRegExp = makeCharRange('a', 'z');
+				resultingRegExp = makeUnion(resultingRegExp, makeCharRange('A', 'Z'));
+				resultingRegExp = makeUnion(resultingRegExp, makeCharRange('0', '9'));
+				resultingRegExp = makeUnion(resultingRegExp, makeChar('_'));
+				break;
+
+			case 'S':
+				negate = true;
+			case 's':
+				resultingRegExp = makeChar('\f');
+				resultingRegExp = makeUnion(resultingRegExp, makeChar('\r'));
+				resultingRegExp = makeUnion(resultingRegExp, makeChar('\t'));
+				resultingRegExp = makeUnion(resultingRegExp, makeChar('\n'));
+				break;
+
+			default:
+				throw new RuntimeException("We shouldn't get here");
+		}
+
+		if (negate) {
+			resultingRegExp = makeIntersection(makeAnyChar(), makeComplement(resultingRegExp));
+		}
+
+		return resultingRegExp;
+	}
+
 	final char parseCharExp() throws IllegalArgumentException {
-		match('\\');
 		return next();
 	}
 
