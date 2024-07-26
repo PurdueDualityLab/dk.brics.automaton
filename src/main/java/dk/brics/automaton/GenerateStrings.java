@@ -65,7 +65,8 @@ public class GenerateStrings {
         return new ArrayList<>(path);
     }
 
-    public static void addPathToList(List<State> path, List<String> language) {
+
+    private static void addPathToList(List<State> path, List<String> language) {
         List<String> pathStrings = new ArrayList<>();
         for (int i = 0; i < path.size() - 1; i++) {
             List<Transition> transitions = findTransitions(path.get(i), path.get(i + 1));
@@ -75,7 +76,7 @@ public class GenerateStrings {
     }
 
 
-    public static List<Transition> findTransitions(State currState, State destState) {
+    private static List<Transition> findTransitions(State currState, State destState) {
         List<Transition> transitions = new ArrayList<>();
         for (Transition t : currState.getTransitions()) {
             if (t.getDest().equals(destState)) {
