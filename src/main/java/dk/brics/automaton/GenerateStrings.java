@@ -1,7 +1,6 @@
 package dk.brics.automaton;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -11,9 +10,9 @@ public class GenerateStrings {
      * Finds an estimation of all the strings a regular expression can match with
      * @param s String representation of a regex
      * @param maxNumVisits Max number of visits per state in regex automaton
-     * @return ArrayList containing positive strings for the regex
+     * @return set containing positive strings for the regex
      */
-    public static List<String> generateStrings(String s, int maxNumVisits) {
+    public static Set<String> generateStrings(String s, int maxNumVisits) {
         RegExp re = new RegExp(s);
         Automaton auto = re.toAutomaton();
 
@@ -21,7 +20,7 @@ public class GenerateStrings {
         List<String> positiveStr = new ArrayList<>();
         traverse(auto.getInitialState(), maxNumVisits, path, positiveStr);
 
-        return positiveStr;
+        return new HashSet<>(positiveStr);
     }
 
     private static void traverse(State currentState, int maxNumVisits, List<State> path, List<String> positiveStr) {
