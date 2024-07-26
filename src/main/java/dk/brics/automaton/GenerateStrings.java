@@ -1,6 +1,7 @@
 package dk.brics.automaton;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -12,41 +13,29 @@ public class GenerateStrings {
      * @param maxNumVisits Max number of visits per state in regex automaton
      * @return ArrayList containing positive strings for the regex
      */
-    public static ArrayList<String> generateStrings(String s, int maxNumVisits) {
+    public static List<String> generateStrings(String s, int maxNumVisits) {
         RegExp re = new RegExp(s);
         Automaton auto = re.toAutomaton();
 
-        ArrayList<State> path = new ArrayList<>();
-        ArrayList<String> positiveStr = new ArrayList<>();
+        List<State> path = new ArrayList<>();
+        List<String> positiveStr = new ArrayList<>();
         traverse(auto.getInitialState(), maxNumVisits, path, positiveStr);
 
         return positiveStr;
     }
 
-    private static void traverse(State curr, int maxNumVisits, ArrayList<State> path, ArrayList<String> positiveStr) {
+    private static void traverse(State currentState, int maxNumVisits, List<State> path, List<String> positiveStr) {
+        List<State> currPath = new ArrayList<>(path);
+        currPath.add(currentState);
+        currentState.numVisits++;
 
-        ArrayList<State> currPath = shallowCopy(path);
-        currPath.add(curr);
-        curr.numVisits++;
-
-        try {
-            if (curr.isAccept()) {
-                addPathToList(currPath, positiveStr);
+        if (currentState.isAccept()) {
+            addPathToList(currPath, positiveStr);
+        }
+        for (Transition t : currentState.getTransitions()) {
+            if (t.getDest().numVisits < maxNumVisits) {
+                traverse(t.getDest(), maxNumVisits, currPath, positiveStr);
             }
-            for (Transition t : curr.getTransitions()) {
-                if (t.getDest().numVisits < maxNumVisits) {
-                    traverse(t.getDest(), maxNumVisits, currPath, positiveStr);
-                }
-            }
-        }
-        catch (OutOfMemoryError e) {
-            System.out.println("OutOfMemoryError" + e);
-        }
-        catch (IllegalArgumentException e) {
-            System.out.println("IllegalArgumentException " + e);
-        }
-        catch (Exception e) {
-            System.out.println("Exception " + e);
         }
     }
 
@@ -58,7 +47,7 @@ public class GenerateStrings {
      */
     public static float eSimilarity(String truthRegexStr, String reuseCandidateStr) {
 
-        ArrayList<String> truthPositiveStr = generateStrings(truthRegexStr, 1);
+        List<String> truthPositiveStr = generateStrings(truthRegexStr, 1);
         Pattern reuseCandidateRegex = Pattern.compile(reuseCandidateStr);
 
         int numPositiveStr = truthPositiveStr.size();
@@ -77,18 +66,18 @@ public class GenerateStrings {
         return new ArrayList<>(path);
     }
 
-    public static void addPathToList(ArrayList<State> path, ArrayList<String> language) {
-        ArrayList<String> pathStrings = new ArrayList<>();
+    public static void addPathToList(List<State> path, List<String> language) {
+        List<String> pathStrings = new ArrayList<>();
         for (int i = 0; i < path.size() - 1; i++) {
-            ArrayList<Transition> transitions = findTransitions(path.get(i), path.get(i + 1));
+            List<Transition> transitions = findTransitions(path.get(i), path.get(i + 1));
             pathStrings = addCharacters(transitions, pathStrings);
         }
         language.add(pathStrings.remove(0));
     }
 
 
-    public static ArrayList<Transition> findTransitions(State currState, State destState) {
-        ArrayList<Transition> transitions = new ArrayList<>();
+    public static List<Transition> findTransitions(State currState, State destState) {
+        List<Transition> transitions = new ArrayList<>();
         for (Transition t : currState.getTransitions()) {
             if (t.getDest().equals(destState)) {
                 transitions.add(t);
@@ -98,9 +87,9 @@ public class GenerateStrings {
     }
 
 
-    private static ArrayList<String> addCharacters(ArrayList<Transition> transitions, ArrayList<String> pathStrings) {
-        ArrayList<String> newPathStrings = new ArrayList<>();
-        ArrayList<Character> charsToAppend = new ArrayList<>();
+    private static List<String> addCharacters(List<Transition> transitions, List<String> pathStrings) {
+        List<String> newPathStrings = new ArrayList<>();
+        List<Character> charsToAppend = new ArrayList<>();
 
         // making a list of each character option to append
         for (Transition t : transitions) {
