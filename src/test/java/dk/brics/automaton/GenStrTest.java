@@ -33,9 +33,9 @@ public class GenStrTest {
     }
 
     private static void analysisTest(String truthRegex, String reuseCandidate) {
-        float result = eSimilarity(truthRegex, reuseCandidate);
+        double result = eSimilarity(truthRegex, reuseCandidate);
         System.out.println(result);
-        float invResult = eSimilarity(reuseCandidate, truthRegex);
+        double invResult = eSimilarity(reuseCandidate, truthRegex);
         System.out.println(invResult);
     }
 

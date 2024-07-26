@@ -44,14 +44,24 @@ public class GenerateStrings {
      * @param reuseCandidateStr String representation of the reuse candidate regex
      * @return e-similarity score as a float (between 0 and 1)
      */
-    public static float eSimilarity(String truthRegexStr, String reuseCandidateStr) {
+    public static double eSimilarity(String truthRegexStr, String reuseCandidateStr) {
 
-        List<String> truthPositiveStr = generateStrings(truthRegexStr, 1);
+        Set<String> truthPositiveStr = generateStrings(truthRegexStr, 1);
         Pattern reuseCandidateRegex = Pattern.compile(reuseCandidateStr);
 
-        int numPositiveStr = truthPositiveStr.size();
+        return eSimilarity(truthPositiveStr, reuseCandidateRegex);
+    }
+
+    /**
+     * Finds the e-similarity score between two regular expressions
+     * @param truthLanguage A collection of strings for the truth language
+     * @param reuseCandidateRegex Compiled pattern
+     * @return e-similarity score as a float (between 0 and 1)
+     */
+    public static double eSimilarity(Collection<String> truthLanguage, Pattern reuseCandidateRegex) {
+        int numPositiveStr = truthLanguage.size();
         int numMatches = 0;
-        for (String s : truthPositiveStr) {
+        for (String s : truthLanguage) {
             Matcher match = reuseCandidateRegex.matcher(s);
             if (match.matches()) {
                 numMatches++;
@@ -59,10 +69,6 @@ public class GenerateStrings {
         }
         int e = 1 - (numMatches / numPositiveStr);
         return 1 - e;
-    }
-
-    private static ArrayList<State> shallowCopy(ArrayList<State> path) {
-        return new ArrayList<>(path);
     }
 
 
