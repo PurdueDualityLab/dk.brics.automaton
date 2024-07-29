@@ -16,7 +16,7 @@ public class GenerateStrings {
      * @param genPositiveStrings Flag for generating either positive strings (true) or negative (false) strings
      * @return ArrayList containing positive strings for the regex
      */
-    public static Set<String> generateStrings(String regExpStr, int maxNumVisits, boolean genPositiveStrings) {
+    public static Set<String> generateStrings(String regExpStr, int maxNumVisits, boolean genPositiveStrings) throws IllegalArgumentException {
         RegExp regExp = new RegExp(regExpStr);
         Automaton automaton = regExp.toAutomaton();
         ArrayList<State> path = new ArrayList<>();
@@ -33,7 +33,7 @@ public class GenerateStrings {
     }
 
 
-    private static void traverse(State curr, int maxNumVisits, ArrayList<State> path, Set<String> strings, boolean sign) {
+    private static void traverse(State curr, int maxNumVisits, ArrayList<State> path, Set<String> strings, boolean sign) throws IllegalArgumentException {
 
         ArrayList<State> currPath = shallowCopy(path);
         currPath.add(curr);
@@ -54,24 +54,22 @@ public class GenerateStrings {
                 }
             }
         }
-        catch (OutOfMemoryError e) {
-            System.out.println("OutOfMemoryError" + e);
-        }
-        catch (IllegalArgumentException e) {
-            System.out.println("IllegalArgumentException " + e);
+        catch (OutOfMemoryError | IllegalArgumentException e) {
+            throw new IllegalArgumentException("Cannot approximate language of regex", e);
         }
         catch (Exception e) {
-            System.out.println("Exception " + e);
+            throw new RuntimeException("Cannot approximate language of regex, but for a reason i can't think of", e);
         }
     }
 
     /**
      * Finds the e-similarity score between two regular expressions
-     * @param truthRegexStr String representation of the truth regex
+     *
+     * @param truthRegexStr     String representation of the truth regex
      * @param reuseCandidateStr String representation of the reuse candidate regex
      * @return e-similarity score as a float (between 0 and 1)
      */
-    public static float eSimilarity(String truthRegexStr, String reuseCandidateStr, int maxNumVisits) {
+    public static double eSimilarity(String truthRegexStr, String reuseCandidateStr, int maxNumVisits) {
 
         Set<String> truthPositiveStr = generateStrings(truthRegexStr, maxNumVisits, true);
         Set<String> truthNegativeStr = generateStrings(truthRegexStr, maxNumVisits, false);
@@ -93,11 +91,6 @@ public class GenerateStrings {
                 numRejects++;
             }
         }
-
-        System.out.println(truthNegativeStr);
-
-        System.out.println("matches: " + numMatches + "/" + numPositiveStr);
-        System.out.println("rejects: "  + numRejects + "/" + numNegativeStr);
         float e = 1 - ((float) (numMatches + numRejects) / (numPositiveStr + numNegativeStr));
         return 1 - e;
     }
