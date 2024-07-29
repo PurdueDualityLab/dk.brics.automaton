@@ -93,7 +93,12 @@ public class GenerateStrings {
                 numRejects++;
             }
         }
-        int e = 1 - ((numMatches + numRejects) / (numPositiveStr + numNegativeStr));
+
+        System.out.println(truthNegativeStr);
+
+        System.out.println("matches: " + numMatches + "/" + numPositiveStr);
+        System.out.println("rejects: "  + numRejects + "/" + numNegativeStr);
+        float e = 1 - ((float) (numMatches + numRejects) / (numPositiveStr + numNegativeStr));
         return 1 - e;
     }
 
