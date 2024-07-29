@@ -813,7 +813,7 @@ public class RegExp {
 			// special case of a meta character
 			RegExp classStart = parseEscapedCharacter();
 			if (match('-')) {
-				if (peek("]")) {
+				if (peek("]") || classStart.kind == Kind.REGEXP_CHAR_RANGE) {
 					return makeUnion(classStart, makeChar('-'));
 				} else {
 					throw new IllegalArgumentException("ranges with named character classes as the ends are not supported");
