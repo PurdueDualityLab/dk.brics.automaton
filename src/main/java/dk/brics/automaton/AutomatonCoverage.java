@@ -7,12 +7,25 @@ public class AutomatonCoverage {
     public static final int FAILURE_STATE_ID = -1;
 
     public static final class Edge {
+
+        public static Edge failEdge(int originState) {
+            return new Edge(originState, FAILURE_STATE_ID, (char) 0, (char) 0);
+        }
+
         private final int leftStateId;
         private final int rightStateId;
+        private final char edgeMin;
+        private final char edgeMax;
 
-        public Edge(int leftStateId, int rightStateId) {
+        public Edge(int leftStateId, int rightStateId, Transition transition) {
+            this(leftStateId, rightStateId, transition.getMin(), transition.getMax());
+        }
+
+        public Edge(int leftStateId, int rightStateId, char edgeMin, char edgeMax) {
             this.leftStateId = leftStateId;
             this.rightStateId = rightStateId;
+            this.edgeMin = edgeMin;
+            this.edgeMax = edgeMax;
         }
 
         @Override
@@ -20,12 +33,12 @@ public class AutomatonCoverage {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Edge edge = (Edge) o;
-            return leftStateId == edge.leftStateId && rightStateId == edge.rightStateId;
+            return leftStateId == edge.leftStateId && rightStateId == edge.rightStateId && edgeMin == edge.edgeMin && edgeMax == edge.edgeMax;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(leftStateId, rightStateId);
+            return Objects.hash(leftStateId, rightStateId, edgeMin, edgeMax);
         }
 
         public int getLeftStateId() {
@@ -38,26 +51,12 @@ public class AutomatonCoverage {
     }
 
     public static final class EdgePair {
-        private final int left;
-        private final int middle;
-        private final int right;
+        private final Edge leftEdge;
+        private final Edge rightEdge;
 
-        public EdgePair(int left, int middle, int right) {
-            this.left = left;
-            this.middle = middle;
-            this.right = right;
-        }
-
-        public int getLeft() {
-            return left;
-        }
-
-        public int getMiddle() {
-            return middle;
-        }
-
-        public int getRight() {
-            return right;
+        public EdgePair(Edge leftEdge, Edge rightEdge) {
+            this.leftEdge = leftEdge;
+            this.rightEdge = rightEdge;
         }
 
         @Override
@@ -65,12 +64,12 @@ public class AutomatonCoverage {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             EdgePair edgePair = (EdgePair) o;
-            return left == edgePair.left && middle == edgePair.middle && right == edgePair.right;
+            return Objects.equals(leftEdge, edgePair.leftEdge) && Objects.equals(rightEdge, edgePair.rightEdge);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(left, middle, right);
+            return Objects.hash(leftEdge, rightEdge);
         }
     }
 
@@ -132,28 +131,6 @@ public class AutomatonCoverage {
                     combinedVisitedEdges,
                     combinedVisitedEdgePairs
             );
-        }
-
-        /**
-         * Visit everything at once.
-         * @param previousState The state we were at
-         * @param currentState The state we are current on
-         * @param nextState The state we are about to go to
-         */
-        public void visitConfiguration(Integer previousState, int currentState, Integer nextState) {
-            // visit the center state
-            addVisitedNode(currentState);
-
-            // add an edge if needed
-            if (previousState == null) {
-                return;
-            }
-
-            addVisitedEdge(new Edge(previousState, currentState));
-
-            if (nextState != null) {
-                addVisitedEdgePair(new EdgePair(previousState, currentState, nextState));
-            }
         }
 
         @Override
@@ -254,8 +231,7 @@ public class AutomatonCoverage {
 
     private VisitationInfo evaluateString(String input, boolean fullMatch) {
         VisitationInfo visitationInfo = new VisitationInfo();
-
-        OptionalInt previousState = OptionalInt.empty(); // used for edge pair
+        Optional<Edge> previousEdge = Optional.empty();
         int stateCursor = this.runAutomaton.getInitialState();
         visitationInfo.addVisitedNode(stateCursor); // first state is always visited
 
@@ -265,12 +241,15 @@ public class AutomatonCoverage {
             int nextState = this.runAutomaton.step(stateCursor, transitionCharacter);
             if (nextState == -1) {
 
+                // add visited node
+                visitationInfo.addVisitedNode(FAILURE_STATE_ID);
+
                 // we have encountered a failure state/edge
-                visitationInfo.addVisitedEdge(new Edge(stateCursor, FAILURE_STATE_ID));
+                Edge failEdge = Edge.failEdge(stateCursor);
+                visitationInfo.addVisitedEdge(failEdge);
 
                 // add an edge pair as well
-                int finalStateCursor2 = stateCursor;
-                previousState.ifPresent(prevState -> visitationInfo.addVisitedEdgePair(new EdgePair(prevState, finalStateCursor2, FAILURE_STATE_ID)));
+                previousEdge.ifPresent(prevEdge -> visitationInfo.addVisitedEdgePair(new EdgePair(prevEdge, failEdge)));
 
                 // there's no outgoing state, then there are two things we can try:
                 if (fullMatch) {
@@ -279,22 +258,22 @@ public class AutomatonCoverage {
                 } else {
                     // otherwise, we should restart the automaton
                     stateCursor = runAutomaton.getInitialState();
-                    previousState = OptionalInt.empty();
+                    previousEdge = Optional.empty();
                 }
             } else {
+                Transition joiningTransition = findTransitionForState(stateCursor, nextState, transitionCharacter).orElseThrow();
                 // We moved to another state, so that state should be marked as visited
                 visitationInfo.addVisitedNode(nextState);
 
                 // construct an edge with our current state info
-                int finalStateCursor1 = stateCursor;
-                previousState.ifPresent(prevState -> visitationInfo.addVisitedEdge(new Edge(prevState, finalStateCursor1)));
+                Edge takenEdge = new Edge(stateCursor, nextState, joiningTransition);
+                visitationInfo.addVisitedEdge(takenEdge);
 
                 // record edge pair if possible
-                int finalStateCursor = stateCursor;
-                previousState.ifPresent(prevState -> visitationInfo.addVisitedEdgePair(new EdgePair(prevState, finalStateCursor, nextState)));
+                previousEdge.ifPresent(prevEdge -> visitationInfo.addVisitedEdgePair(new EdgePair(prevEdge, takenEdge)));
 
                 // move states along
-                previousState = OptionalInt.of(stateCursor);
+                previousEdge = Optional.of(takenEdge);
                 stateCursor = nextState;
             }
             // Update the cursor
@@ -320,5 +299,22 @@ public class AutomatonCoverage {
      */
     private int computeNumberOfEdgePairs() {
         return transitionTable.countPossibleEdgePairs() + originalAutomaton.getNumberOfTransitions();
+    }
+
+    /**
+     * Find a transition between the two given states that accepts the given transition character
+     * @param startState left state
+     * @param endState destination state
+     * @param transitionChar The character
+     * @return Transition between the two with the given character, or empty if doesn't exist
+     */
+    private Optional<Transition> findTransitionForState(int startState, int endState, char transitionChar) {
+        try {
+            return transitionTable.getTransitionsBetweenStates(startState, endState).stream()
+                    .filter(transition -> transition.getMin() <= transitionChar && transitionChar <= transition.getMax())
+                    .findFirst();
+        } catch (NoSuchElementException notFound) {
+            return Optional.empty();
+        }
     }
 }

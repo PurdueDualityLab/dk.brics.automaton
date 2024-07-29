@@ -115,12 +115,20 @@ public class TransitionTable {
     public int countPossibleEdgePairs() {
         Set<AutomatonCoverage.EdgePair> edgePairs = new HashSet<>();
         for (int leftState : table.keySet()) {
-            Set<Integer> possibleMiddleStates = getSuccessors(leftState);
-            for (int middleState : possibleMiddleStates) {
-                Set<Integer> rightStates = getSuccessors(middleState);
-                for (int rightState : rightStates) {
-                    edgePairs.add(new AutomatonCoverage.EdgePair(leftState, middleState, rightState));
-                }
+            Set<AutomatonCoverage.Edge> leftEdges = getSuccessors(leftState).stream()
+                    .flatMap(leftSuccessor -> {
+                        return getTransitionsBetweenStates(leftState, leftSuccessor).stream()
+                                .map(transition -> new AutomatonCoverage.Edge(leftState, leftSuccessor, transition));
+                    })
+                    .collect(Collectors.toSet());
+
+            for (AutomatonCoverage.Edge leftEdge : leftEdges) {
+                getSuccessors(leftEdge.getRightStateId()).stream()
+                        .flatMap(middleSuccessor -> {
+                            return getTransitionsBetweenStates(leftEdge.getRightStateId(), middleSuccessor).stream()
+                                    .map(transition -> new AutomatonCoverage.Edge(leftEdge.getRightStateId(), middleSuccessor, transition));
+                        })
+                        .forEach(destEdge -> edgePairs.add(new AutomatonCoverage.EdgePair(leftEdge, destEdge)));
             }
         }
 

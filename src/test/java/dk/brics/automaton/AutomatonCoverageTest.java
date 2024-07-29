@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,12 +18,17 @@ class AutomatonCoverageTest {
         coverage.evaluate("a");
         coverage.evaluate("b");
         coverage.evaluate("c");
-        AutomatonCoverage.VisitationInfo info = coverage.getFullMatchVisitationInfo();
-
-        Set<Integer> liveStates = statesToStateNums(auto.getLiveStates());
-
-        assertThat(info.getVisitedNodes()).containsExactlyElementsOf(liveStates);
-        assertThat(info.getVisitedEdges().size()).isEqualTo(auto.getNumberOfTransitions());
+        coverage.evaluate("aa");
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactlyInAnyOrder(-1, 0, 1);
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(1.0);
+                }
+        );
     }
 
     @Test
@@ -32,10 +38,30 @@ class AutomatonCoverageTest {
         AutomatonCoverage coverage = new AutomatonCoverage(auto);
 
         coverage.evaluate("abd");
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactlyInAnyOrderElementsOf(statesToStateNums(auto.getLiveStates()));
+                    assertThat(info.getVisitedEdges().size()).isEqualTo(auto.getNumberOfTransitions());
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isLessThan(1.0);
+                    assertThat(summary.getEdgeCoverage()).isLessThan(1.0);
+                }
+        );
 
-        AutomatonCoverage.VisitationInfo info = coverage.getFullMatchVisitationInfo();
-        assertThat(info.getVisitedNodes()).containsExactlyInAnyOrderElementsOf(statesToStateNums(auto.getLiveStates()));
-        assertThat(info.getVisitedEdges().size()).isEqualTo(auto.getNumberOfTransitions());
+        coverage.evaluate("b");
+        coverage.evaluate("ae");
+        coverage.evaluate("abe");
+        coverage.evaluate("abde");
+        assertFullMatchCoverage(
+                coverage,
+                info -> {},
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(1.0);
+                }
+        );
     }
 
     @Test
@@ -83,6 +109,73 @@ class AutomatonCoverageTest {
         assertThat(info.getVisitedEdges().size()).isEqualTo(auto.getNumberOfTransitions());
     }
 
+    @Test
+    void pattern4_coverage_hasCompleteCoverage() throws DfaTooLargeException {
+        Automaton auto = prepareRegex("[a-z0-9]*A");
+        System.out.println(auto.toDot());
+        AutomatonCoverage coverage = new AutomatonCoverage(auto);
+
+        coverage.evaluate("A");
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactly(0, 1);
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isLessThan(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(1.0 / 5.0);
+                }
+        );
+
+        coverage.evaluate("*");
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactlyInAnyOrder(0, 1, -1);
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(2.0 / 5.0);
+                }
+        );
+
+        coverage.evaluate("Ab");
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactlyInAnyOrder(0, 1, -1);
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(3.0 / 5.0);
+                }
+        );
+
+        coverage.evaluate("aA");
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactlyInAnyOrder(0, 1, -1);
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(4.0 / 5.0);
+                }
+        );
+
+        coverage.evaluate("0A");
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactlyInAnyOrder(0, 1, -1);
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(1.0);
+                }
+        );
+    }
+
     private static Automaton prepareRegex(String pattern) {
         RegExp regex = new RegExp(pattern, RegExp.NONE);
         Automaton auto = regex.toAutomaton();
@@ -93,5 +186,21 @@ class AutomatonCoverageTest {
 
     private static Set<Integer> statesToStateNums(Collection<State> states) {
         return states.stream().map(state -> state.number).collect(Collectors.toSet());
+    }
+
+    private static void assertFullMatchCoverage(AutomatonCoverage coverage,
+                                       Consumer<AutomatonCoverage.VisitationInfo> onVisitationInfo,
+                                       Consumer<AutomatonCoverage.VisitationInfoSummary> onVisitationInfoSummary) {
+
+        onVisitationInfo.accept(coverage.getFullMatchVisitationInfo());
+        onVisitationInfoSummary.accept(coverage.getFullMatchVisitationInfoSummary());
+    }
+
+    private static void assertPartialMatchCoverage(AutomatonCoverage coverage,
+                                                Consumer<AutomatonCoverage.VisitationInfo> onVisitationInfo,
+                                                Consumer<AutomatonCoverage.VisitationInfoSummary> onVisitationInfoSummary) {
+
+        onVisitationInfo.accept(coverage.getPartialMatchVisitationInfo());
+        onVisitationInfoSummary.accept(coverage.getPartialMatchVisitationInfoSummary());
     }
 }
