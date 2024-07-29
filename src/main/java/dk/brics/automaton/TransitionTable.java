@@ -1,7 +1,9 @@
 package dk.brics.automaton;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class TransitionTable {
 
@@ -22,23 +24,25 @@ public class TransitionTable {
         return destinationMap;
     }
 
-    private static Set<State> getAdjacentStates(State state) {
+    private static List<State> getAdjacentStates(State state) {
         Set<State> neighbors = new HashSet<>();
         for (Transition dest : state.transitions) {
             neighbors.add(dest.to);
         }
 
-        return neighbors;
+        return neighbors.stream().sorted().collect(Collectors.toList());
     }
 
     // Sparse matrix transition table. For each map, the key is the destination state, and the value is a set of
     // transitions that can be used to transition between the two
     private final Map<Integer, Map<Integer, Set<Transition>>> table;
+    private final Set<Integer> acceptStates;
 
     public TransitionTable(Automaton auto) {
 
         // Initialize table
-        table = new HashMap<>();
+        this.table = new HashMap<>();
+        this.acceptStates = new HashSet<>();
 
         // Populate table
         Set<Integer> visitedStates = new HashSet<>();
@@ -46,6 +50,9 @@ public class TransitionTable {
         traversalQueue.add(auto.getInitialState());
         while (!traversalQueue.isEmpty()) {
             State state = traversalQueue.remove();
+            if (state.isAccept()) {
+                acceptStates.add(state.number);
+            }
             visitedStates.add(state.id);
             // Create the entry for this state
             Map<Integer, Set<Transition>> destinationMap = createDestTableFromState(state);
@@ -53,9 +60,9 @@ public class TransitionTable {
             // Get the next states to check. Only enqueue states that we haven't visited yet
             getAdjacentStates(state).stream()
                     .filter(neighbor -> !visitedStates.contains(neighbor.id))
-                    .forEach(item -> {
-                        if (!traversalQueue.contains(item)) {
-                            traversalQueue.add(item);
+                    .forEach(neighbor -> {
+                        if (!traversalQueue.contains(neighbor)) {
+                            traversalQueue.add(neighbor);
                         }
                     });
         }
@@ -112,27 +119,88 @@ public class TransitionTable {
                 .findAny();
     }
 
-    public int countPossibleEdgePairs() {
+    public Set<AutomatonCoverage.EdgePair> possibleEdgePairs() {
         Set<AutomatonCoverage.EdgePair> edgePairs = new HashSet<>();
         for (int leftState : table.keySet()) {
-            Set<AutomatonCoverage.Edge> leftEdges = getSuccessors(leftState).stream()
+            Stream<Integer> leftSuccessorStates = Stream.concat(
+                    Stream.of(-1),
+                    getSuccessors(leftState).stream()
+            );
+            Set<AutomatonCoverage.Edge> leftEdges = leftSuccessorStates
                     .flatMap(leftSuccessor -> {
+                        if (leftSuccessor == -1) {
+                            return Stream.of(AutomatonCoverage.Edge.failEdge(leftState));
+                        }
+
                         return getTransitionsBetweenStates(leftState, leftSuccessor).stream()
                                 .map(transition -> new AutomatonCoverage.Edge(leftState, leftSuccessor, transition));
                     })
                     .collect(Collectors.toSet());
 
             for (AutomatonCoverage.Edge leftEdge : leftEdges) {
-                getSuccessors(leftEdge.getRightStateId()).stream()
+                int middleState = leftEdge.getRightStateId();
+                Stream<Integer> middleSuccessorStates = Stream.concat(
+                        Stream.of(-1),
+                        getSuccessors(middleState).stream()
+                );
+
+                middleSuccessorStates
                         .flatMap(middleSuccessor -> {
-                            return getTransitionsBetweenStates(leftEdge.getRightStateId(), middleSuccessor).stream()
-                                    .map(transition -> new AutomatonCoverage.Edge(leftEdge.getRightStateId(), middleSuccessor, transition));
+                            if (middleSuccessor == -1) {
+                                return Stream.of(AutomatonCoverage.Edge.failEdge(middleState));
+                            }
+
+                            return getTransitionsBetweenStates(middleState, middleSuccessor).stream()
+                                    .map(transition -> new AutomatonCoverage.Edge(middleState, middleSuccessor, transition));
                         })
                         .forEach(destEdge -> edgePairs.add(new AutomatonCoverage.EdgePair(leftEdge, destEdge)));
             }
         }
 
-        return edgePairs.size();
+        return edgePairs;
+    }
+
+    public String toDot() {
+
+        Function<Character, String> printableCharacter = (ch) -> {
+            if (Character.isAlphabetic(ch) || Character.isDigit(ch)) {
+                return String.valueOf(ch);
+            } else {
+                return String.format("u%d", Character.getNumericValue(ch));
+            }
+        };
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("digraph automaton {\n");
+        builder.append("\trankdir = LR;\n");
+        for (int state : this.table.keySet()) {
+            String shape = acceptStates.contains(state) ? "doublecircle" : "circle";
+            builder.append(String.format("\t%d [shape=%s, label=%d]\n", state, shape, state));
+        }
+
+        for (Map.Entry<Integer, Map<Integer, Set<Transition>>> entry : table.entrySet()) {
+            int originState = entry.getKey();
+            Map<Integer, Set<Transition>> destMap = entry.getValue();
+            for (Map.Entry<Integer, Set<Transition>> destEntry : destMap.entrySet()) {
+                int dest = destEntry.getKey();
+                Set<Transition> transitions = destEntry.getValue();
+
+                for (Transition trans : transitions) {
+                    String label;
+                    if (trans.getMin() == trans.getMax()) {
+                        label = printableCharacter.apply(trans.getMin());
+                    } else {
+                        String lowerPrintableBound = printableCharacter.apply(trans.getMin());
+                        String upperPrintableBound = printableCharacter.apply(trans.getMax());
+                        label = String.format("[%s,%s]", lowerPrintableBound, upperPrintableBound);
+                    }
+                    builder.append(String.format("\t%d -> %d [label=\"%s,%d\"]\n", originState, dest, label, trans.getId()));
+                }
+            }
+        }
+
+        builder.append("}\n");
+        return builder.toString();
     }
 
     private Set<Integer> getSuccessors(int state) {

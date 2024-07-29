@@ -1,6 +1,10 @@
 package dk.brics.automaton;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 public class AutomatonCoverage {
 
@@ -9,23 +13,25 @@ public class AutomatonCoverage {
     public static final class Edge {
 
         public static Edge failEdge(int originState) {
-            return new Edge(originState, FAILURE_STATE_ID, (char) 0, (char) 0);
+            return new Edge(originState, FAILURE_STATE_ID, (char) 0, (char) 0, -1);
         }
 
         private final int leftStateId;
         private final int rightStateId;
         private final char edgeMin;
         private final char edgeMax;
+        private final int transId;
 
         public Edge(int leftStateId, int rightStateId, Transition transition) {
-            this(leftStateId, rightStateId, transition.getMin(), transition.getMax());
+            this(leftStateId, rightStateId, transition.getMin(), transition.getMax(), transition.getId());
         }
 
-        public Edge(int leftStateId, int rightStateId, char edgeMin, char edgeMax) {
+        public Edge(int leftStateId, int rightStateId, char edgeMin, char edgeMax, int transId) {
             this.leftStateId = leftStateId;
             this.rightStateId = rightStateId;
             this.edgeMin = edgeMin;
             this.edgeMax = edgeMax;
+            this.transId = transId;
         }
 
         @Override
@@ -39,6 +45,17 @@ public class AutomatonCoverage {
         @Override
         public int hashCode() {
             return Objects.hash(leftStateId, rightStateId, edgeMin, edgeMax);
+        }
+
+        @Override
+        public String toString() {
+            return "Edge{" +
+                    "leftStateId=" + leftStateId +
+                    ", rightStateId=" + rightStateId +
+                    ", transId=" + transId +
+                    ", edgeMin=" + edgeMin +
+                    ", edgeMax=" + edgeMax +
+                    '}';
         }
 
         public int getLeftStateId() {
@@ -70,6 +87,14 @@ public class AutomatonCoverage {
         @Override
         public int hashCode() {
             return Objects.hash(leftEdge, rightEdge);
+        }
+
+        @Override
+        public String toString() {
+            return "EdgePair{" +
+                    "leftEdge=" + leftEdge +
+                    ", rightEdge=" + rightEdge +
+                    '}';
         }
     }
 
@@ -200,6 +225,15 @@ public class AutomatonCoverage {
         partialMatchVisitationInfo = new VisitationInfo();
     }
 
+    protected AutomatonCoverage(Automaton automaton, TransitionTable transitionTable) {
+        this.originalAutomaton = automaton;
+        this.runAutomaton = new RunAutomaton(automaton);
+        this.transitionTable = transitionTable;
+
+        fullMatchVisitationInfo = new VisitationInfo();
+        partialMatchVisitationInfo = new VisitationInfo();
+    }
+
     public void evaluate(String subject) {
         fullMatchVisitationInfo.foldIn(evaluateString(subject, true));
         partialMatchVisitationInfo.foldIn(evaluateString(subject, false));
@@ -253,6 +287,14 @@ public class AutomatonCoverage {
 
                 // there's no outgoing state, then there are two things we can try:
                 if (fullMatch) {
+
+                    // if there is any remaining input, then we should add an edge for the covered self loop
+                    if (currentPos + 1 < input.length()) {
+                        Edge failSelfLoop = Edge.failEdge(FAILURE_STATE_ID);
+                        visitationInfo.addVisitedEdge(failSelfLoop);
+                        visitationInfo.addVisitedEdgePair(new EdgePair(failEdge, failSelfLoop));
+                    }
+
                     // if we're in full match mode, then we're done
                     break;
                 } else {
@@ -285,12 +327,15 @@ public class AutomatonCoverage {
 
     private int computeNumberOfStates() {
         // add one for the error state
-        return originalAutomaton.getLiveStates().size() + 1;
+        return originalAutomaton.getLiveStates().size() // all states already in the automaton
+                + 1; // plus the error state
     }
 
     private int computeNumberOfEdges() {
         // all edges + an edge from each state to the failure state
-        return originalAutomaton.getNumberOfTransitions() + originalAutomaton.getNumberOfStates();
+        return originalAutomaton.getNumberOfTransitions() // all edges from normal node to normal node
+                + originalAutomaton.getNumberOfStates() // + an edge from each node to the fail state
+                + 1; // plus an edge from the fail state to the fail state
     }
 
     /**
@@ -298,7 +343,13 @@ public class AutomatonCoverage {
      * @return Number of possible edge pairs
      */
     private int computeNumberOfEdgePairs() {
-        return transitionTable.countPossibleEdgePairs() + originalAutomaton.getNumberOfTransitions();
+        return transitionTable.possibleEdgePairs().size();
+    }
+
+    Set<EdgePair> missingFullMatchEdgePairs() {
+        Set<EdgePair> possibleEdges = transitionTable.possibleEdgePairs();
+        possibleEdges.removeAll(fullMatchVisitationInfo.getVisitedEdgePairs());
+        return possibleEdges;
     }
 
     /**

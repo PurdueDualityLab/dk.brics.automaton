@@ -49,10 +49,12 @@ class RegExpTest {
         Automaton auto = regexp.toAutomaton();
         RunAutomaton runAutomaton = new RunAutomaton(auto);
 
-        boolean findsDigit = runAutomaton.newMatcher("a").find();
+        boolean findsDigit = runAutomaton.newMatcher("0").find();
+        boolean findsDigit2 = runAutomaton.newMatcher("8").find();
         boolean findsAlpha = runAutomaton.newMatcher("a").find();
         boolean findsBigAlpha = runAutomaton.newMatcher("A").find();
         assertThat(findsDigit).isTrue();
+        assertThat(findsDigit2).isTrue();
         assertThat(findsAlpha).isTrue();
         assertThat(findsBigAlpha).isFalse();
     }

@@ -36,8 +36,9 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -50,7 +51,7 @@ public class RunAutomaton implements Serializable {
 
 	int size;
 	boolean[] accept;
-	int initial;
+	final int initial;
 	int[] transitions; // delta(state,c) = transitions[state*points.length + getCharClass(c)]
 	char[] points; // char interval start points
 	int[] classmap; // map from char number to class class
@@ -139,9 +140,6 @@ public class RunAutomaton implements Serializable {
 		return SpecialOperations.findIndex(c, points);
 	}
 
-	@SuppressWarnings("unused")
-	private RunAutomaton() {}
-
 	/**
 	 * Constructs a new <code>RunAutomaton</code> from a deterministic
 	 * <code>Automaton</code>. Same as <code>RunAutomaton(a, true)</code>.
@@ -202,9 +200,8 @@ public class RunAutomaton implements Serializable {
 		size = states.size();
 		accept = new boolean[size];
 		transitions = new int[size * points.length];
-		for (int n = 0; n < size * points.length; n++)
-			transitions[n] = -1;
-		for (State s : states) {
+		Arrays.fill(transitions, -1);
+		for (State s : states.stream().sorted(Comparator.comparingInt(state -> state.number)).collect(Collectors.toList())) {
 			int n = s.number;
 			accept[n] = s.accept;
 			for (int c = 0; c < points.length; c++) {

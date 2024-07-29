@@ -3,6 +3,7 @@ package dk.brics.automaton;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -19,6 +20,7 @@ class AutomatonCoverageTest {
         coverage.evaluate("b");
         coverage.evaluate("c");
         coverage.evaluate("aa");
+        coverage.evaluate("aaa");
         assertFullMatchCoverage(
                 coverage,
                 info -> {
@@ -54,6 +56,7 @@ class AutomatonCoverageTest {
         coverage.evaluate("ae");
         coverage.evaluate("abe");
         coverage.evaluate("abde");
+        coverage.evaluate("abdee");
         assertFullMatchCoverage(
                 coverage,
                 info -> {},
@@ -123,7 +126,7 @@ class AutomatonCoverageTest {
                 },
                 summary -> {
                     assertThat(summary.getNodeCoverage()).isLessThan(1.0);
-                    assertThat(summary.getEdgeCoverage()).isEqualTo(1.0 / 5.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(1.0 / 6.0);
                 }
         );
 
@@ -135,7 +138,7 @@ class AutomatonCoverageTest {
                 },
                 summary -> {
                     assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
-                    assertThat(summary.getEdgeCoverage()).isEqualTo(2.0 / 5.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(2.0 / 6.0);
                 }
         );
 
@@ -147,7 +150,7 @@ class AutomatonCoverageTest {
                 },
                 summary -> {
                     assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
-                    assertThat(summary.getEdgeCoverage()).isEqualTo(3.0 / 5.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(3.0 / 6.0);
                 }
         );
 
@@ -159,11 +162,12 @@ class AutomatonCoverageTest {
                 },
                 summary -> {
                     assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
-                    assertThat(summary.getEdgeCoverage()).isEqualTo(4.0 / 5.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(4.0 / 6.0);
                 }
         );
 
         coverage.evaluate("0A");
+        coverage.evaluate("0AAA");
         assertFullMatchCoverage(
                 coverage,
                 info -> {
@@ -172,6 +176,188 @@ class AutomatonCoverageTest {
                 summary -> {
                     assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
                     assertThat(summary.getEdgeCoverage()).isEqualTo(1.0);
+                }
+        );
+    }
+
+    @Test
+    void pattern6_coverage_hasFullCoverage() {
+        Automaton auto = prepareRegex("\\d*([A-Z\\s]|[bc])+e");
+        // TransitionTable transitionTable = new TransitionTable(auto);
+        // System.out.println(transitionTable.toDot());
+        AutomatonCoverage coverage = new AutomatonCoverage(auto);
+
+        coverage.evaluate("0Ae");
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactlyInAnyOrder(0, 1, 2);
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isLessThan(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(3 / 14.0);
+                    assertThat(summary.getEdgePairCoverage()).isEqualTo(2.0 / 58.0);
+                }
+        );
+
+        coverage.evaluate("be");
+        coverage.evaluate("Ze");
+        coverage.evaluate("\te");
+        coverage.evaluate("\u000ce");
+
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactlyInAnyOrder(0, 1, 2);
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isLessThan(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(6 / 14.0);
+                    assertThat(summary.getEdgePairCoverage()).isEqualTo(5.0 / 58.0);
+                }
+        );
+
+        coverage.evaluate("bbe");
+        coverage.evaluate("ZAe");
+        coverage.evaluate("\t\te");
+        coverage.evaluate("\u000c\u000ce");
+
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactlyInAnyOrder(0, 1, 2);
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isLessThan(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(10 / 14.0);
+                    assertThat(summary.getEdgePairCoverage()).isEqualTo(13.0 / 58.0);
+                }
+        );
+
+        coverage.evaluate("a");
+        coverage.evaluate("Aa");
+        coverage.evaluate("AeA");
+        coverage.evaluate("AeAA");
+
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                    assertThat(info.getVisitedNodes()).containsExactlyInAnyOrder(-1, 0, 1, 2);
+                },
+                summary -> {
+                    assertThat(summary.getNodeCoverage()).isEqualTo(1.0);
+                    assertThat(summary.getEdgeCoverage()).isEqualTo(1.0);
+                    assertThat(summary.getEdgePairCoverage()).isEqualTo(16.0 / 58.0);
+                }
+        );
+
+        coverageEvaluateAllIterable(coverage, Set.of(
+                "0a",
+                // one repetition
+                //
+                "0bbe",
+                "0bAe",
+                "0b\te",
+                "0b\u000ce",
+                //
+                "0ZAe",
+                "0Z\te",
+                "0Z\u000ce",
+                "0Zbe",
+                //
+                "0\t\te",
+                "0\t\u000ce",
+                "0\tbe",
+                "0\tAe",
+                //
+                "0\u000c\u000ce",
+                "0\u000cbe",
+                "0\u000cAe",
+                "0\u000c\te",
+                // two repetitions
+                //
+                "0bbbe",
+                "0bbAe",
+                "0bb\te",
+                "0bb\u000ce",
+                //
+                "0bZAe",
+                "0bZ\te",
+                "0bZ\u000ce",
+                "0bZbe",
+                //
+                "0b\t\te",
+                "0b\t\u000ce",
+                "0b\tbe",
+                "0b\tAe",
+                //
+                "0b\u000c\u000ce",
+                "0b\u000cbe",
+                "0b\u000cAe",
+                "0b\u000c\te",
+                // fail EPs
+                // one repetition
+                //
+                "0bbz",
+                "0bAz",
+                "0b\tz",
+                "0b\u000cz",
+                //
+                "0ZAz",
+                "0Z\tz",
+                "0Z\u000cz",
+                "0Zbz",
+                //
+                "0\t\tz",
+                "0\t\u000cz",
+                "0\tbz",
+                "0\tAz",
+                //
+                "0\u000c\u000cz",
+                "0\u000cbz",
+                "0\u000cAz",
+                "0\u000c\tz",
+                // two repetitions
+                //
+                "0bbbz",
+                "0bbAz",
+                "0bb\tz",
+                "0bb\u000cz",
+                //
+                "0bZAz",
+                "0bZ\tz",
+                "0bZ\u000cz",
+                "0bZbz",
+                //
+                "0b\t\tz",
+                "0b\t\u000cz",
+                "0b\tbz",
+                "0b\tAz",
+                //
+                "0b\u000c\u000cz",
+                "0b\u000cbz",
+                "0b\u000cAz",
+                "0b\u000c\tz",
+                // All fail self loops
+                //
+                "0ab",
+                "AAA",
+                "AeAA",
+                "zzz",
+                "00zz",
+                // other's that i missed
+                "\tz",
+                "\u000cz",
+                "bzzzz"
+        ));
+        for (AutomatonCoverage.EdgePair missing : coverage.missingFullMatchEdgePairs()) {
+            System.out.println(missing);
+        }
+        assertFullMatchCoverage(
+                coverage,
+                info -> {},
+                summary -> {
+                    assertThat(summary.getEdgePairCoverage()).isEqualTo(1.0);
                 }
         );
     }
@@ -202,5 +388,9 @@ class AutomatonCoverageTest {
 
         onVisitationInfo.accept(coverage.getPartialMatchVisitationInfo());
         onVisitationInfoSummary.accept(coverage.getPartialMatchVisitationInfoSummary());
+    }
+
+    private static void coverageEvaluateAllIterable(AutomatonCoverage coverage, Collection<String> strings) {
+        strings.forEach(coverage::evaluate);
     }
 }
