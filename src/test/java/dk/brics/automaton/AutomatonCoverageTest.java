@@ -362,6 +362,18 @@ class AutomatonCoverageTest {
         );
     }
 
+    @Test
+    public void productionPattern1_shouldNotHaveGt1NodeCoverage() {
+        Automaton auto = prepareRegex("[\\d-.]+(\\w+)$");
+        AutomatonCoverage coverage = new AutomatonCoverage(auto);
+        coverageEvaluateAllIterable(coverage, Set.of("0", "10px", "16px", "1Q", "1cm", "1in", "1mm", "1pc", "1pt", "1px","1rem", "2em", "2rem", "50vh", "50vw"));
+        assertFullMatchCoverage(
+                coverage,
+                info -> {},
+                summary -> assertThat(summary.getNodeCoverage()).isLessThanOrEqualTo(1.0)
+        );
+    }
+
     private static Automaton prepareRegex(String pattern) {
         RegExp regex = new RegExp(pattern, RegExp.NONE);
         Automaton auto = regex.toAutomaton();
