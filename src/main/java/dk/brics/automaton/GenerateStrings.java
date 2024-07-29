@@ -124,7 +124,12 @@ public class GenerateStrings {
                 numRejects++;
             }
         }
-        float e = 1 - ((float) (numMatches + numRejects) / (numPositiveStr + numNegativeStr));
+
+        return eSimilarity(numMatches, numRejects, numPositiveStr, numNegativeStr);
+    }
+
+    public static double eSimilarity(int numMatches, int numRejects, int positiveStringCount, int negativeStringCount) {
+        double e = 1 - ((double) (numMatches + numRejects)) / ((double) (positiveStringCount + negativeStringCount));
         return 1 - e;
     }
 
