@@ -722,9 +722,18 @@ public class RegExp {
 
 	final RegExp parseUnionExp() throws IllegalArgumentException {
 		// check for start anchor, discard if necessary
+		if (peek("^")) {
+			next();
+		}
+
 		RegExp e = parseInterExp();
 		if (match('|'))
 			e = makeUnion(e, parseUnionExp());
+
+		// check for ending anchor, discard if necessary
+		if (peek("$")) {
+			next();
+		}
 
 		return e;
 	}
@@ -854,6 +863,19 @@ public class RegExp {
 		} else if (match('(')) {
 			if (match(')'))
 				return makeString("");
+			else if (peek("?")) {
+				// figure out if there is group stuff
+				char questionMark = next();
+				if (peek("=!<")) {
+					// =,! -> look ahead
+					// <   -> look behind (<=, <!) or named capture group (<name>)
+					char operator = next();
+					throw new IllegalArgumentException(String.format("group construct %c%c is not supported", questionMark, operator));
+				} else if (peek(":")) {
+					// ?: -> non-capture group
+					next();
+				}
+			}
 			RegExp e = parseUnionExp();
 			if (!match(')'))
 				throw new IllegalArgumentException("expected ')' at position " + pos);

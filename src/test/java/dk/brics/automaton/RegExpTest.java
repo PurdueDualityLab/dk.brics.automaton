@@ -80,4 +80,32 @@ class RegExpTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("bound 1000 is too large to be compiled (must be <= 100)");
     }
+
+    @Test
+    public void failToParse_lookAheadAssertion() {
+        assertThatThrownBy(() -> new RegExp("(?![a-z]+)"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("group construct ?!");
+    }
+
+    @Test
+    public void failToParse_lookAheadAssertion2() {
+        assertThatThrownBy(() -> new RegExp("(?=[a-z]+)"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("group construct ?=");
+    }
+
+    @Test
+    public void failToParse_lookBehindAssertion() {
+        assertThatThrownBy(() -> new RegExp("(?<![a-z]+)"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("group construct ?<");
+    }
+
+    @Test
+    public void failToParse_lookBehindAssertion2() {
+        assertThatThrownBy(() -> new RegExp("(?<=[a-z]+)"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("group construct ?<");
+    }
 }
