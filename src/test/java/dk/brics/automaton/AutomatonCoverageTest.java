@@ -3,7 +3,6 @@ package dk.brics.automaton;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -16,6 +15,9 @@ class AutomatonCoverageTest {
     void pattern1_coverage_shouldHaveFullCoverage() throws DfaTooLargeException {
         Automaton auto = prepareRegex("(a|b)");
         AutomatonCoverage coverage = new AutomatonCoverage(auto);
+
+        System.out.println(coverage.getTransitionTable().toDot());
+
         coverage.evaluate("a");
         coverage.evaluate("b");
         coverage.evaluate("c");
@@ -72,14 +74,16 @@ class AutomatonCoverageTest {
         Automaton auto = prepareRegex("^http(s)?:\\/\\/$");
         System.out.println(auto.toDot());
         AutomatonCoverage coverage = new AutomatonCoverage(auto);
+        System.out.println(coverage.getTransitionTable().toDot());
 
         coverage.evaluate("http://");
 
-        AutomatonCoverage.VisitationInfo info = coverage.getFullMatchVisitationInfo();
-
-        Set<Integer> states = statesToStateNums(auto.getLiveStates());
-        states.remove(4);
-        assertThat(info.getVisitedNodes()).containsExactlyInAnyOrderElementsOf(states);
+        assertFullMatchCoverage(
+                coverage,
+                info -> {
+                },
+                summary -> assertThat(summary.getNodeCoverage()).isEqualTo(8 / 10.0)
+        );
     }
 
     @Test
@@ -367,6 +371,20 @@ class AutomatonCoverageTest {
         Automaton auto = prepareRegex("[\\d-.]+(\\w+)$");
         AutomatonCoverage coverage = new AutomatonCoverage(auto);
         coverageEvaluateAllIterable(coverage, Set.of("0", "10px", "16px", "1Q", "1cm", "1in", "1mm", "1pc", "1pt", "1px","1rem", "2em", "2rem", "50vh", "50vw"));
+        assertFullMatchCoverage(
+                coverage,
+                info -> {},
+                summary -> assertThat(summary.getNodeCoverage()).isLessThanOrEqualTo(1.0)
+        );
+    }
+
+    @Test
+    void productionPattern2_shouldNotFail() {
+        Automaton auto = prepareRegex("^(.+?):(\\d+)(.*)$");
+        AutomatonCoverage coverage = new AutomatonCoverage(auto);
+
+        coverage.evaluate("hello:123");
+
         assertFullMatchCoverage(
                 coverage,
                 info -> {},

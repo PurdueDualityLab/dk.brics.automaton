@@ -37,8 +37,11 @@ public class TransitionTable {
     // transitions that can be used to transition between the two
     private final Map<Integer, Map<Integer, Set<Transition>>> table;
     private final Set<Integer> acceptStates;
+    private final int initialState;
 
     public TransitionTable(Automaton auto) {
+
+        auto.determinize();
 
         // Initialize table
         this.table = new HashMap<>();
@@ -76,6 +79,8 @@ public class TransitionTable {
                 }
             }
         }
+
+        this.initialState = auto.getInitialState().number;
     }
 
     /**
@@ -103,6 +108,26 @@ public class TransitionTable {
         }
 
         return this.table.get(leftStateNumber).get(rightStateNumber);
+    }
+
+    /**
+     * Step operation. Given the current state, try to step forward with the given transition character. Finds the first
+     * available transition. If one is not available, then empty is returned
+     * @param currentState The current state
+     * @param transitionCharacter The character to take
+     * @return The id of the next state, or empty if there is no suitable transition
+     */
+    public OptionalInt step(int currentState, char transitionCharacter) {
+        return this.table.get(currentState).entrySet().stream()
+                .filter(destinationEntry -> {
+                    Optional<Transition> linkingTransition = destinationEntry.getValue().stream()
+                            .filter(destinationTransition -> destinationTransition.accepts(transitionCharacter))
+                            .findAny();
+
+                    return linkingTransition.isPresent();
+                })
+                .mapToInt(Map.Entry::getKey)
+                .findFirst();
     }
 
     /**
@@ -158,6 +183,10 @@ public class TransitionTable {
         }
 
         return edgePairs;
+    }
+
+    public int getInitialState() {
+        return initialState;
     }
 
     public String toDot() {

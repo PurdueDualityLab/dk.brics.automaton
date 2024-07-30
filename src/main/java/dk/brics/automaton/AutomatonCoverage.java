@@ -1,10 +1,6 @@
 package dk.brics.automaton;
 
-import java.util.HashSet;
-import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 public class AutomatonCoverage {
 
@@ -210,7 +206,6 @@ public class AutomatonCoverage {
     }
 
     private final Automaton originalAutomaton;
-    private final RunAutomaton runAutomaton;
     private final TransitionTable transitionTable;
 
     private final VisitationInfo fullMatchVisitationInfo;
@@ -218,7 +213,6 @@ public class AutomatonCoverage {
 
     public AutomatonCoverage(Automaton automaton) {
         this.originalAutomaton = automaton;
-        this.runAutomaton = new RunAutomaton(automaton);
         this.transitionTable = new TransitionTable(automaton);
 
         fullMatchVisitationInfo = new VisitationInfo();
@@ -227,7 +221,6 @@ public class AutomatonCoverage {
 
     protected AutomatonCoverage(Automaton automaton, TransitionTable transitionTable) {
         this.originalAutomaton = automaton;
-        this.runAutomaton = new RunAutomaton(automaton);
         this.transitionTable = transitionTable;
 
         fullMatchVisitationInfo = new VisitationInfo();
@@ -266,14 +259,14 @@ public class AutomatonCoverage {
     private VisitationInfo evaluateString(String input, boolean fullMatch) {
         VisitationInfo visitationInfo = new VisitationInfo();
         Optional<Edge> previousEdge = Optional.empty();
-        int stateCursor = this.runAutomaton.getInitialState();
-        visitationInfo.addVisitedNode(stateCursor); // first state is always visited
+        int stateCursor = transitionTable.getInitialState();
+        visitationInfo.addVisitedNode(stateCursor);
 
         int currentPos = 0;
         while (currentPos < input.length()) {
             char transitionCharacter = input.charAt(currentPos);
-            int nextState = this.runAutomaton.step(stateCursor, transitionCharacter);
-            if (nextState == -1) {
+            OptionalInt nextStateOpt = this.transitionTable.step(stateCursor, transitionCharacter);
+            if (nextStateOpt.isEmpty()) {
 
                 // add visited node
                 visitationInfo.addVisitedNode(FAILURE_STATE_ID);
@@ -299,10 +292,11 @@ public class AutomatonCoverage {
                     break;
                 } else {
                     // otherwise, we should restart the automaton
-                    stateCursor = runAutomaton.getInitialState();
+                    stateCursor = transitionTable.getInitialState();
                     previousEdge = Optional.empty();
                 }
             } else {
+                int nextState = nextStateOpt.getAsInt();
                 Transition joiningTransition = findTransitionForState(stateCursor, nextState, transitionCharacter).orElseThrow();
                 // We moved to another state, so that state should be marked as visited
                 visitationInfo.addVisitedNode(nextState);
@@ -350,6 +344,10 @@ public class AutomatonCoverage {
         Set<EdgePair> possibleEdges = transitionTable.possibleEdgePairs();
         possibleEdges.removeAll(fullMatchVisitationInfo.getVisitedEdgePairs());
         return possibleEdges;
+    }
+
+    protected TransitionTable getTransitionTable() {
+        return transitionTable;
     }
 
     /**

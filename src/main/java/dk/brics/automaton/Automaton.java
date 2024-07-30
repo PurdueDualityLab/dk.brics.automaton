@@ -402,7 +402,7 @@ public class Automaton implements Serializable, Cloneable {
 	 * Returns sorted array of all interval start points. 
 	 */
 	char[] getStartPoints() {
-		Set<Character> pointset = new HashSet<Character>();
+		Set<Character> pointset = new HashSet<>();
 		pointset.add(Character.MIN_VALUE);
 		for (State s : getStates()) {
 			for (Transition t : s.transitions) {
@@ -600,9 +600,9 @@ public class Automaton implements Serializable, Cloneable {
 		for (State s : states) {
 			b.append("  ").append(s.number);
 			if (s.accept)
-				b.append(" [shape=doublecircle,label=\"\"];\n");
+				b.append(String.format(" [shape=doublecircle,label=\"%d\"];\n", s.number));
 			else
-				b.append(" [shape=circle,label=\"\"];\n");
+				b.append(String.format(" [shape=circle,label=\"%d\"];\n", s.number));
 			if (s == initial) {
 				b.append("  initial [shape=plaintext,label=\"\"];\n");
 				b.append("  initial -> ").append(s.number).append("\n");
