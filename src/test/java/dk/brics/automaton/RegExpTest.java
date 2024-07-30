@@ -3,6 +3,7 @@ package dk.brics.automaton;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RegExpTest {
@@ -57,5 +58,26 @@ class RegExpTest {
         assertThat(findsDigit2).isTrue();
         assertThat(findsAlpha).isTrue();
         assertThat(findsBigAlpha).isFalse();
+    }
+
+    @Test
+    public void throwException_when_lowerBoundIsTooLarge() {
+        assertThatThrownBy(() -> new RegExp("a{300,1000}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("bound 300 is too large to be compiled (must be <= 100)");
+    }
+
+    @Test
+    public void throwException_when_upperBoundIsTooLarge() {
+        assertThatThrownBy(() -> new RegExp("a{1,1000}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("bound 1000 is too large to be compiled (must be <= 100)");
+    }
+
+    @Test
+    public void throwException_when_singleBoundIsTooLarge() {
+        assertThatThrownBy(() -> new RegExp("a{1000}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("bound 1000 is too large to be compiled (must be <= 100)");
     }
 }

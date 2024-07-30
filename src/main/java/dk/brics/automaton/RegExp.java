@@ -770,6 +770,10 @@ public class RegExp {
 					m = n;
 				if (!match('}'))
 					throw new IllegalArgumentException("expected '}' at position " + pos);
+
+				checkRepetitionBound(n);
+				checkRepetitionBound(m);
+
 				if (m == -1)
 					e = makeRepeat(e, n);
 				else
@@ -961,5 +965,11 @@ public class RegExp {
 		int end = pattern.charAt(pattern.length() - 1) == '$' ? pattern.length() - 1 : pattern.length();
 
 		return pattern.substring(start, end);
+	}
+
+	private static void checkRepetitionBound(int bound) throws IllegalArgumentException {
+		if (bound > 100) {
+			throw new IllegalArgumentException(String.format("bound %d is too large to be compiled (must be <= 100)", bound));
+		}
 	}
 }
