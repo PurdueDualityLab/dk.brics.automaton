@@ -48,7 +48,7 @@ public class TransitionTable {
         this.acceptStates = new HashSet<>();
 
         // Populate table
-        Set<Integer> visitedStates = new HashSet<>();
+        Set<State> visitedStates = new HashSet<>();
         Queue<State> traversalQueue = new ArrayDeque<>();
         traversalQueue.add(auto.getInitialState());
         while (!traversalQueue.isEmpty()) {
@@ -56,31 +56,23 @@ public class TransitionTable {
             if (state.isAccept()) {
                 acceptStates.add(state.number);
             }
-            visitedStates.add(state.id);
+            visitedStates.add(state);
             // Create the entry for this state
             Map<Integer, Set<Transition>> destinationMap = createDestTableFromState(state);
             table.put(state.number, destinationMap);
             // Get the next states to check. Only enqueue states that we haven't visited yet
             getAdjacentStates(state).stream()
-                    .filter(neighbor -> !visitedStates.contains(neighbor.id))
-                    .forEach(neighbor -> {
-                        if (!traversalQueue.contains(neighbor)) {
-                            traversalQueue.add(neighbor);
-                        }
-                    });
-        }
-
-        // Give everything an ID
-        for (Map.Entry<Integer, Map<Integer, Set<Transition>>> originEntry : table.entrySet()) {
-            for (Map.Entry<Integer, Set<Transition>> destEntry : originEntry.getValue().entrySet()) {
-                for (Transition transition : destEntry.getValue()) {
-                    int id = Objects.hash(originEntry.getKey(), destEntry.getKey(), transition.min, transition.max);
-                    transition.setId(id);
-                }
-            }
+                    .filter(neighbor -> !visitedStates.contains(neighbor))
+                    .forEach(traversalQueue::add);
         }
 
         this.initialState = auto.getInitialState().number;
+    }
+
+    public Set<Integer> states() {
+        Set<Integer> keySet = new HashSet<>(this.table.keySet());
+        table.values().stream().flatMap(destMap -> destMap.keySet().stream()).forEach(keySet::add);
+        return keySet;
     }
 
     /**
@@ -193,7 +185,7 @@ public class TransitionTable {
             if (Character.isAlphabetic(ch) || Character.isDigit(ch)) {
                 return String.valueOf(ch);
             } else {
-                return String.format("u%d", Character.getNumericValue(ch));
+                return String.format("\\u%04x", (int) ch);
             }
         };
 
@@ -221,7 +213,7 @@ public class TransitionTable {
                         String upperPrintableBound = printableCharacter.apply(trans.getMax());
                         label = String.format("[%s,%s]", lowerPrintableBound, upperPrintableBound);
                     }
-                    builder.append(String.format("\t%d -> %d [label=\"%s,%d\"]\n", originState, dest, label, trans.getId()));
+                    builder.append(String.format("\t%d -> %d [label=\"%s\"]\n", originState, dest, label));
                 }
             }
         }
