@@ -392,6 +392,20 @@ class AutomatonCoverageTest {
         );
     }
 
+    @Test
+    void productionPattern3_shouldNotFail() {
+        Automaton auto = prepareRegex("(?:\\b0x(?:[\\da-f]+\\.?[\\da-f]*|\\.[\\da-f]+)(?:p[+-]?\\d+)?|(?:\\b\\d+\\.?\\d*|\\B\\.\\d+)(?:e[+-]?\\d+)?)[ful]*");
+        AutomatonCoverage coverage = new AutomatonCoverage(auto);
+
+        coverage.evaluate("0xdead.beefp-123");
+
+        assertFullMatchCoverage(
+                coverage,
+                info -> {},
+                summary -> assertThat(summary.getNodeCoverage()).isLessThanOrEqualTo(1.0)
+        );
+    }
+
     private static Automaton prepareRegex(String pattern) {
         RegExp regex = new RegExp(pattern, RegExp.NONE);
         Automaton auto = regex.toAutomaton();

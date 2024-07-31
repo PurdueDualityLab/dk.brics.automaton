@@ -117,15 +117,13 @@ public class TransitionTable {
      * @param transitionCharacter The character to take
      * @return The id of the next state, or empty if there is no suitable transition
      */
-    public OptionalInt step(int currentState, char transitionCharacter) {
-        return this.table.get(currentState).entrySet().stream()
-                .filter(destinationEntry -> {
-                    Optional<Transition> linkingTransition = destinationEntry.getValue().stream()
-                            .filter(destinationTransition -> destinationTransition.accepts(transitionCharacter))
-                            .findAny();
+    public OptionalInt step(int currentState, char transitionCharacter) throws NoSuchElementException {
+        Map<Integer, Set<Transition>> stateTransitions = Optional.ofNullable(this.table.get(currentState))
+                .orElseThrow(() -> new NoSuchElementException(String.format("State %d is not in the transition table", currentState)));
 
-                    return linkingTransition.isPresent();
-                })
+        return stateTransitions.entrySet().stream()
+                .filter(destinationEntry -> destinationEntry.getValue().stream()
+                        .anyMatch(destinationTransition -> destinationTransition.accepts(transitionCharacter)))
                 .mapToInt(Map.Entry::getKey)
                 .findFirst();
     }
