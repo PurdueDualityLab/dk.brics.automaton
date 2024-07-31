@@ -270,13 +270,13 @@ public class AutomatonCoverage {
             try {
                 nextStateOpt = this.transitionTable.step(stateCursor, transitionCharacter);
             } catch (NoSuchElementException noElement) {
-                System.out.println("context:");
-                System.out.printf("string: '%s'%n", input);
-                System.out.printf("transitionCharacter: '%c'%n", transitionCharacter);
-                System.out.printf("currentPos: %d%n", currentPos);
-                System.out.printf("current state: %d%n", stateCursor);
-                System.out.println("DOT REP:");
-                System.out.println(transitionTable.toDot());
+                System.err.println("context:");
+                System.err.printf("string: '%s'%n", input);
+                System.err.printf("transitionCharacter: '%c'%n", transitionCharacter);
+                System.err.printf("currentPos: %d%n", currentPos);
+                System.err.printf("current state: %d%n", stateCursor);
+                System.err.println("DOT REP:");
+                System.err.println(transitionTable.toDot());
                 throw noElement;
             }
 
