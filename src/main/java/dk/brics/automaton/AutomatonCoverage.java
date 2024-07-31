@@ -1,5 +1,9 @@
 package dk.brics.automaton;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.*;
 
 public class AutomatonCoverage {
@@ -270,13 +274,23 @@ public class AutomatonCoverage {
             try {
                 nextStateOpt = this.transitionTable.step(stateCursor, transitionCharacter);
             } catch (NoSuchElementException noElement) {
-                System.err.println("context:");
-                System.err.printf("string: '%s'%n", input);
-                System.err.printf("transitionCharacter: '%c'%n", transitionCharacter);
-                System.err.printf("currentPos: %d%n", currentPos);
-                System.err.printf("current state: %d%n", stateCursor);
-                System.err.println("DOT REP:");
-                System.err.println(transitionTable.toDot());
+                try {
+                    File dumpFile = new File("coverage-failure-dump.txt");
+                    PrintWriter writer = new PrintWriter(new FileWriter(dumpFile, false));
+                    writer.println("context:");
+                    writer.printf("string: '%s'%n", input);
+                    writer.printf("transitionCharacter: '%c'%n", transitionCharacter);
+                    writer.printf("currentPos: %d%n", currentPos);
+                    writer.printf("current state: %d%n", stateCursor);
+                    writer.println("Automaton DOT REP:");
+                    writer.println(originalAutomaton.toDot());
+                    writer.println("Transition table DOT REP:");
+                    writer.println(transitionTable.toDot());
+                    writer.flush();
+                    writer.close();
+                } catch (IOException exe) {
+                    System.err.println("failed to write coverage dump");
+                }
                 throw noElement;
             }
 
