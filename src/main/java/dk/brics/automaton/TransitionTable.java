@@ -53,6 +53,12 @@ public class TransitionTable {
         traversalQueue.add(auto.getInitialState());
         while (!traversalQueue.isEmpty()) {
             State state = traversalQueue.remove();
+
+            // skip states that have already been visited to keep traversal queue from growing unbounded-ly
+            if (visitedStates.contains(state)) {
+                continue;
+            }
+
             if (state.isAccept()) {
                 acceptStates.add(state.number);
             }
