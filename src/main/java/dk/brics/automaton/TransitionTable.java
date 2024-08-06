@@ -63,6 +63,7 @@ public class TransitionTable {
             // Get the next states to check. Only enqueue states that we haven't visited yet
             getAdjacentStates(state).stream()
                     .filter(neighbor -> !visitedStates.contains(neighbor))
+                    .distinct() // only visit unique adjacent states
                     .forEach(traversalQueue::add);
         }
 
