@@ -108,4 +108,11 @@ class RegExpTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("group construct ?<");
     }
+
+    @Test
+    public void parseRegex_andConvertToAutomaton() {
+        RegExp regex = new RegExp("?(?:(a):)?(\\w{2,32}):(\\d{17,19})?");
+        Automaton auto = regex.toAutomaton();
+        System.out.println(auto.toDot());
+    }
 }

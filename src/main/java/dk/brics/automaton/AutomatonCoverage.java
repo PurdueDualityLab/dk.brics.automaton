@@ -1,9 +1,5 @@
 package dk.brics.automaton;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.*;
 
 public class AutomatonCoverage {
@@ -100,14 +96,14 @@ public class AutomatonCoverage {
 
     public static final class VisitationInfo {
         private final Set<Integer> visitedNodes;
-        private final Set<Edge> visitedEdges;
+        private final Map<Edge, Set<Character>> visitedEdges;
         private final Set<EdgePair> visitedEdgePairs;
 
         public VisitationInfo() {
-            this(new HashSet<>(), new HashSet<>(), new HashSet<>());
+            this(new HashSet<>(), new HashMap<>(), new HashSet<>());
         }
 
-        public VisitationInfo(Set<Integer> visitedNodes, Set<Edge> visitedEdges, Set<EdgePair> visitedEdgePairs) {
+        public VisitationInfo(Set<Integer> visitedNodes, Map<Edge, Set<Character>> visitedEdges, Set<EdgePair> visitedEdgePairs) {
             this.visitedNodes = visitedNodes;
             this.visitedEdges = visitedEdges;
             this.visitedEdgePairs = visitedEdgePairs;
@@ -117,7 +113,7 @@ public class AutomatonCoverage {
             return visitedNodes;
         }
 
-        public Set<Edge> getVisitedEdges() {
+        public Map<Edge, Set<Character>> getVisitedEdges() {
             return visitedEdges;
         }
 
@@ -129,8 +125,9 @@ public class AutomatonCoverage {
             visitedNodes.add(node);
         }
 
-        public void addVisitedEdge(Edge edge) {
-            visitedEdges.add(edge);
+        public void addVisitedEdge(Edge edge, char ch) {
+            visitedEdges.putIfAbsent(edge, new HashSet<>());
+            visitedEdges.get(edge).add(ch);
         }
 
         public void addVisitedEdgePair(EdgePair edgePair) {
@@ -139,23 +136,11 @@ public class AutomatonCoverage {
 
         public void foldIn(VisitationInfo other) {
             this.visitedNodes.addAll(other.getVisitedNodes());
-            this.visitedEdges.addAll(other.getVisitedEdges());
+            other.getVisitedEdges().forEach((key, value) -> this.visitedEdges.merge(key, value, (existing, incoming) -> {
+                existing.addAll(incoming);
+                return existing;
+            }));
             this.visitedEdgePairs.addAll(other.getVisitedEdgePairs());
-        }
-
-        public VisitationInfo combineWith(VisitationInfo other) {
-            Set<Integer> combinedVisitedNodes = new HashSet<>(this.visitedNodes);
-            combinedVisitedNodes.addAll(other.visitedNodes);
-            Set<Edge> combinedVisitedEdges = new HashSet<>(this.visitedEdges);
-            combinedVisitedEdges.addAll(other.visitedEdges);
-            Set<EdgePair> combinedVisitedEdgePairs = new HashSet<>(this.visitedEdgePairs);
-            combinedVisitedEdgePairs.addAll(other.visitedEdgePairs);
-
-            return new VisitationInfo(
-                    combinedVisitedNodes,
-                    combinedVisitedEdges,
-                    combinedVisitedEdgePairs
-            );
         }
 
         @Override
@@ -209,6 +194,17 @@ public class AutomatonCoverage {
         }
     }
 
+    private static double edgeCoverageAmount(Edge edge, Set<Character> coveredChars) {
+        // edges to error states always get complete covered. We are less interested in how covered these are
+        // than if they are covered at all
+        if (edge.leftStateId == FAILURE_STATE_ID || edge.rightStateId == FAILURE_STATE_ID) {
+            return 1;
+        }
+
+        int totalCharacters = edge.edgeMax - edge.edgeMin + 1;
+        return ((double) coveredChars.size()) / totalCharacters;
+    }
+
     private final Automaton originalAutomaton;
     private final TransitionTable transitionTable;
 
@@ -246,7 +242,10 @@ public class AutomatonCoverage {
 
     private VisitationInfoSummary summarizeVisitationInfo(VisitationInfo info) {
         double nodeCoverage = (double) info.getVisitedNodes().size() / computeNumberOfStates();
-        double edgeCoverage = (double) info.getVisitedEdges().size() / computeNumberOfEdges();
+        double allEdgeCoverageAmount = info.getVisitedEdges().entrySet().stream()
+                .mapToDouble(entry -> edgeCoverageAmount(entry.getKey(), entry.getValue()))
+                .sum();
+        double edgeCoverage = allEdgeCoverageAmount / computeNumberOfEdges();
         double edgePairCoverage = (double) info.getVisitedEdgePairs().size() / computeNumberOfEdgePairs();
 
         return new VisitationInfoSummary(nodeCoverage, edgeCoverage, edgePairCoverage);
@@ -270,31 +269,7 @@ public class AutomatonCoverage {
         while (currentPos < input.length()) {
             char transitionCharacter = input.charAt(currentPos);
 
-            OptionalInt nextStateOpt;
-            try {
-                nextStateOpt = this.transitionTable.step(stateCursor, transitionCharacter);
-            } catch (NoSuchElementException noElement) {
-                try {
-                    File dumpFile = new File("coverage-failure-dump.txt");
-                    PrintWriter writer = new PrintWriter(new FileWriter(dumpFile, false));
-                    writer.println("context:");
-                    writer.printf("string: '%s'%n", input);
-                    writer.printf("transitionCharacter: '%c'%n", transitionCharacter);
-                    writer.printf("currentPos: %d%n", currentPos);
-                    writer.printf("current state: %d%n", stateCursor);
-                    writer.println("Automaton DOT REP:");
-                    writer.println(originalAutomaton.toDot());
-                    writer.println("Transition table DOT REP:");
-                    writer.println(transitionTable.toDot());
-                    writer.flush();
-                    writer.close();
-                } catch (IOException exe) {
-                    System.err.println("failed to write coverage dump");
-                }
-                throw noElement;
-            }
-
-
+            OptionalInt nextStateOpt = this.transitionTable.step(stateCursor, transitionCharacter);
             if (nextStateOpt.isEmpty()) {
 
                 // add visited node
@@ -302,7 +277,7 @@ public class AutomatonCoverage {
 
                 // we have encountered a failure state/edge
                 Edge failEdge = Edge.failEdge(stateCursor);
-                visitationInfo.addVisitedEdge(failEdge);
+                visitationInfo.addVisitedEdge(failEdge, transitionCharacter);
 
                 // add an edge pair as well
                 previousEdge.ifPresent(prevEdge -> visitationInfo.addVisitedEdgePair(new EdgePair(prevEdge, failEdge)));
@@ -313,7 +288,7 @@ public class AutomatonCoverage {
                     // if there is any remaining input, then we should add an edge for the covered self loop
                     if (currentPos + 1 < input.length()) {
                         Edge failSelfLoop = Edge.failEdge(FAILURE_STATE_ID);
-                        visitationInfo.addVisitedEdge(failSelfLoop);
+                        visitationInfo.addVisitedEdge(failSelfLoop, transitionCharacter);
                         visitationInfo.addVisitedEdgePair(new EdgePair(failEdge, failSelfLoop));
                     }
 
@@ -332,7 +307,7 @@ public class AutomatonCoverage {
 
                 // construct an edge with our current state info
                 Edge takenEdge = new Edge(stateCursor, nextState, joiningTransition);
-                visitationInfo.addVisitedEdge(takenEdge);
+                visitationInfo.addVisitedEdge(takenEdge, transitionCharacter);
 
                 // record edge pair if possible
                 previousEdge.ifPresent(prevEdge -> visitationInfo.addVisitedEdgePair(new EdgePair(prevEdge, takenEdge)));
