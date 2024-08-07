@@ -124,8 +124,7 @@ public class GenerateStrings {
                 numRejects++;
             }
         }
-        float e = 1 - ((float) (numMatches + numRejects) / (numPositiveStr + numNegativeStr));
-        return 1 - e;
+        return ((double) (numMatches + numRejects) / (numPositiveStr + numNegativeStr));
     }
 
     private static ArrayList<State> shallowCopy(ArrayList<State> path) {
@@ -177,8 +176,13 @@ public class GenerateStrings {
 
         if (sign) {
             for (Transition t : transitions) {
-                for (char c = t.getMin(); c <= t.getMax(); c++) {
-                    charsToAppend.add(c);
+
+                if (t.getMin() == 0x0000 && t.getMax() == 0xffff) {
+                    charsToAppend.add(genCharacters(t));
+                } else {
+                    for (char c = t.getMin(); c <= t.getMax(); c++) {
+                        charsToAppend.add(c);
+                    }
                 }
             }
         }
