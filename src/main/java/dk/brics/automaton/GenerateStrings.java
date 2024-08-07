@@ -182,8 +182,7 @@ public class GenerateStrings {
     }
 
     public static double eSimilarity(int numMatches, int numRejects, int positiveStringCount, int negativeStringCount) {
-        double e = 1 - ((double) (numMatches + numRejects)) / ((double) (positiveStringCount + negativeStringCount));
-        return 1 - e;
+        return ((double) (numMatches + numRejects) / (positiveStringCount + negativeStringCount));
     }
 
     private static ArrayList<State> shallowCopy(ArrayList<State> path) {
