@@ -5,49 +5,101 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class GenerateStrings {
+
+    public static final class GenerateStringsConfiguration {
+        private final boolean generatePositive;
+        private final int maxNumVisits;
+        private final int characterClassSampleCount;
+
+        public GenerateStringsConfiguration() {
+            this(true, 3, 0);
+        }
+
+        public GenerateStringsConfiguration(boolean generatePositive, int maxNumVisits, int characterClassSampleCount) {
+            this.generatePositive = generatePositive;
+            this.maxNumVisits = maxNumVisits;
+            this.characterClassSampleCount = characterClassSampleCount;
+        }
+
+        public GenerateStringsConfiguration withMaxNumVisits(Function<Integer, Integer> transformer) {
+            int newVisitMax = transformer.apply(this.maxNumVisits);
+            if (newVisitMax == this.maxNumVisits) {
+                return this;
+            }
+
+            return new GenerateStringsConfiguration(generatePositive, newVisitMax, this.characterClassSampleCount);
+        }
+
+        public GenerateStringsConfiguration withMaxNumVisits(int newVisitMax) {
+            return this.withMaxNumVisits((unused) -> newVisitMax);
+        }
+
+        public GenerateStringsConfiguration withGeneratePositiveStrings(boolean genPositive) {
+            if (isGeneratePositive() ^ genPositive) {
+                return this;
+            }
+
+            return new GenerateStringsConfiguration(genPositive, this.maxNumVisits, this.characterClassSampleCount);
+        }
+
+        public boolean isGeneratePositive() {
+            return generatePositive;
+        }
+
+        public int getMaxNumVisits() {
+            return maxNumVisits;
+        }
+
+        public int getCharacterClassSampleCount() {
+            return characterClassSampleCount;
+        }
+
+        public boolean isTakeAll() {
+            return characterClassSampleCount <= 0;
+        }
+    }
 
     /**
      * Finds an estimation of all the strings a regular expression can match with
      * @param regExpStr String representation of a regex
-     * @param maxNumVisits Max number of visits per state in regex automaton
-     * @param genPositiveStrings Flag for generating either positive strings (true) or negative (false) strings
      * @return ArrayList containing positive strings for the regex
      * @throws IllegalArgumentException might be due to parsing, or regex is too large to estimate
      */
-    public static Set<String> generateStrings(String regExpStr, int maxNumVisits, boolean genPositiveStrings) throws IllegalArgumentException {
+    public static Set<String> generateStrings(String regExpStr, GenerateStringsConfiguration configuration) throws IllegalArgumentException {
         RegExp regExp = new RegExp(regExpStr);
         Automaton automaton = regExp.toAutomaton();
-        return generateStrings(automaton, maxNumVisits, genPositiveStrings);
+        return generateStrings(automaton, configuration);
     }
 
     /**
      * Finds an estimation of all the strings a regular expression can match with
      * @param regexAuto String representation of a regex
-     * @param maxNumVisits Max number of visits per state in regex automaton
-     * @param genPositiveStrings Flag for generating either positive strings (true) or negative (false) strings
      * @return ArrayList containing positive strings for the regex
      * @throws IllegalArgumentException regex is too large to estimate
      */
-    public static Set<String> generateStrings(Automaton regexAuto, int maxNumVisits, boolean genPositiveStrings) throws IllegalArgumentException {
+    public static Set<String> generateStrings(Automaton regexAuto, GenerateStringsConfiguration configuration) throws IllegalArgumentException {
         ArrayList<State> path = new ArrayList<>();
         Set<String> strings = new HashSet<>();
 
-        if (genPositiveStrings) {
-            traverse(regexAuto.getInitialState(), maxNumVisits, path, strings, true);
+        if (configuration.isGeneratePositive()) {
+            traverse(regexAuto.getInitialState(), path, strings, configuration);
         }
         else {
             Automaton autoCompliment = regexAuto.complement();
-            traverse(autoCompliment.getInitialState(), maxNumVisits, path, strings, false);
+            traverse(autoCompliment.getInitialState(), path, strings, configuration);
         }
         return strings;
     }
 
 
-    private static void traverse(State curr, int maxNumVisits, ArrayList<State> path, Set<String> strings, boolean sign) throws IllegalArgumentException {
+    private static void traverse(State curr, ArrayList<State> path, Set<String> strings, GenerateStringsConfiguration config) throws IllegalArgumentException {
 
         ArrayList<State> currPath = shallowCopy(path);
         currPath.add(curr);
@@ -55,15 +107,16 @@ public class GenerateStrings {
 
         try {
             if (curr.isAccept()) {
-                addPathToList(currPath, strings, sign);
+                addPathToList(currPath, strings, config);
             }
             for (Transition t : curr.getTransitions()) {
-                if (t.getDest().numVisits < maxNumVisits) {
+                if (t.getDest().numVisits < config.getMaxNumVisits()) {
                     if (curr.equals(t.getDest())) {
-                        traverse(t.getDest(), maxNumVisits / 2, currPath, strings, sign);
+                        GenerateStringsConfiguration reducedVisitsConfig = config.withMaxNumVisits(originalValue -> originalValue / 2);
+                        traverse(t.getDest(), currPath, strings, reducedVisitsConfig);
                     }
                     else {
-                        traverse(t.getDest(), maxNumVisits, currPath, strings, sign);
+                        traverse(t.getDest(), currPath, strings, config);
                     }
                 }
             }
@@ -83,13 +136,13 @@ public class GenerateStrings {
      * @param reuseCandidateStr String representation of the reuse candidate regex
      * @return e-similarity score as a float (between 0 and 1)
      */
-    public static double eSimilarity(String truthRegexStr, String reuseCandidateStr, int maxNumVisits, boolean fullMatchOrPartialMatch) {
+    public static double eSimilarity(String truthRegexStr, String reuseCandidateStr, GenerateStringsConfiguration config) {
 
-        Set<String> truthPositiveStr = generateStrings(truthRegexStr, maxNumVisits, true);
-        Set<String> truthNegativeStr = generateStrings(truthRegexStr, maxNumVisits, false);
+        Set<String> truthPositiveStr = generateStrings(truthRegexStr, config.withGeneratePositiveStrings(true));
+        Set<String> truthNegativeStr = generateStrings(truthRegexStr, config.withGeneratePositiveStrings(false));
         Pattern reuseCandidateRegex = Pattern.compile(reuseCandidateStr);
         Predicate<String> tester = (inputString) -> {
-            if (fullMatchOrPartialMatch) {
+            if (config.isGeneratePositive()) {
                 return reuseCandidateRegex.matcher(inputString).matches();
             } else {
                 return reuseCandidateRegex.matcher(inputString).find();
@@ -137,11 +190,11 @@ public class GenerateStrings {
         return new ArrayList<>(path);
     }
 
-    private static void addPathToList(ArrayList<State> path, Set<String> strings, boolean sign) {
+    private static void addPathToList(ArrayList<State> path, Set<String> strings, GenerateStringsConfiguration config) {
         ArrayList<String> pathStrings = new ArrayList<>();
         for (int i = 0; i < path.size() - 1; i++) {
             ArrayList<Transition> transitions = findTransitions(path.get(i), path.get(i + 1));
-            pathStrings = addCharacters(transitions, pathStrings, sign);
+            pathStrings = addCharacters(transitions, pathStrings, config);
         }
         strings.addAll(pathStrings);
     }
@@ -158,9 +211,9 @@ public class GenerateStrings {
     }
 
 
-    private static ArrayList<String> addCharacters(ArrayList<Transition> transitions, ArrayList<String> pathStrings, boolean sign) {
+    private static ArrayList<String> addCharacters(ArrayList<Transition> transitions, ArrayList<String> pathStrings, GenerateStringsConfiguration config) {
         ArrayList<String> newPathStrings = new ArrayList<>();
-        ArrayList<Character> charsToAppend = getCharsToAppend(transitions, sign);
+        Collection<Character> charsToAppend = getCharsToAppend(transitions, config);
 
         // adding characters
         if (!pathStrings.isEmpty()) {
@@ -177,41 +230,70 @@ public class GenerateStrings {
         return newPathStrings;
     }
 
-    private static ArrayList<Character> getCharsToAppend(ArrayList<Transition> transitions, boolean sign) {
-        ArrayList<Character> charsToAppend = new ArrayList<>();
+    private static Collection<Character> getCharsToAppend(ArrayList<Transition> transitions, GenerateStringsConfiguration config) {
+        Set<Character> charsToAppend = new HashSet<>();
 
-        if (sign) {
-            for (Transition t : transitions) {
-                for (char c = t.getMin(); c <= t.getMax(); c++) {
-                    charsToAppend.add(c);
-                }
-            }
+        // TODO astonishment...
+        int sampleCount = config.isGeneratePositive() ? config.getCharacterClassSampleCount() : 1;
+        for (Transition t : transitions) {
+            charsToAppend.addAll(sampleTransitionCharacters(t, sampleCount));
         }
-        else {
-            for (Transition t : transitions) {
-                charsToAppend.add(genCharacters(t));
-            }
-        }
+
         return charsToAppend;
     }
 
-    private static char genCharacters(Transition transition) {
+    private static Set<Character> sampleTransitionCharacters(Transition transition, int sampleCount) {
+        // get the range we actually want to sample
+        Pair<Character, Character> sampleRange = sliceRangeToUnicode(transition);
+        char sampleRangeLower = sampleRange.getLeft();
+        char sampleRangeUpper = sampleRange.getRight();
 
-        if (transition.getMin() == transition.getMax()) {
-            return transition.getMin();
+        return sampleTransitionCharacters(sampleRangeLower, sampleRangeUpper, sampleCount);
+    }
+
+    private static Set<Character> sampleTransitionCharacters(char lower, char upper, int maxCharCount) {
+
+        int transitionCharacterCount = upper - lower + 1; // plus one cause it includes max
+        if (maxCharCount <= 0 || transitionCharacterCount <= maxCharCount) {
+            return IntStream.rangeClosed(lower, upper)
+                    .mapToObj(ival -> (char) ival)
+                    .collect(Collectors.toSet());
         }
 
+        // otherwise, we need to sample
+        Set<Character> characterSample = new HashSet<>();
         Random random = new Random();
+        while (characterSample.size() < maxCharCount) {
+            int randomCharacterInt = random.nextInt((int) upper - (int) lower) + (int) lower;
+            characterSample.add((char) randomCharacterInt);
+        }
+
+        return characterSample;
+    }
+
+    private static Pair<Character, Character> sliceRangeToUnicode(Transition transition) {
+        return sliceRangeToUnicode(transition.getMin(), transition.getMax());
+    }
+
+    /**
+     * Given a range of characters, try to slice down to only pleasant unicode characters. If the character range
+     * is entirely outside unicode, then return the range unchanged
+     * @param transitionLower Transition lower bound
+     * @param transitionUpper transition upper bound, inclusive
+     * @return Pair of characters representing inclusive sliced range
+     */
+    private static Pair<Character, Character> sliceRangeToUnicode(char transitionLower, char transitionUpper) {
         int minRangeValue;
         int maxRangeValue;
-        if (transition.getMin() > 0x007e || transition.getMax() < 0x0020) {
-            minRangeValue = transition.getMin();
-            maxRangeValue = transition.getMax();
+        // 0x007e = , 0x0020 =
+        if (transitionLower > 0x007e || transitionUpper < 0x0020) {
+            minRangeValue = transitionLower;
+            maxRangeValue = transitionUpper;
         } else {
-            minRangeValue = Math.max(transition.getMin(), 0x0020);
-            maxRangeValue = Math.min(transition.getMax(), 0x007e);
+            minRangeValue = Math.max(transitionLower, 0x0020);
+            maxRangeValue = Math.min(transitionUpper, 0x007e);
         }
-        int randomCharacter = random.nextInt(maxRangeValue - minRangeValue) + minRangeValue;
-        return (char) randomCharacter;
+
+        return Pair.of((char) minRangeValue, (char) maxRangeValue);
     }
 }
